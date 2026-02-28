@@ -1,0 +1,117 @@
+{
+  "projectType": "saas",
+  "projectName": "OpenTogetherTube",
+  "projectDescription": "Watch videos synchronously with friends in real-time rooms with no account required.",
+  "theme": "almond",
+  "primaryColor": "#FF6B6B",
+  "lightColor": "#FFE5E5",
+  "darkColor": "#CC5555",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/rooms",
+              "features/video-sync",
+              "features/permissions",
+              "features/voting",
+              "features/sponsorblock"
+            ]
+          },
+          {
+            "group": "Supported Platforms",
+            "pages": [
+              "platforms/overview",
+              "platforms/youtube",
+              "platforms/vimeo",
+              "platforms/direct-media"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "self-hosting/deployment",
+              "self-hosting/configuration",
+              "self-hosting/reverse-proxy",
+              "self-hosting/database"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/setup",
+              "development/architecture",
+              "development/contributing",
+              "development/testing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "REST Endpoints",
+            "pages": [
+              "api/rooms",
+              "api/users",
+              "api/data"
+            ]
+          },
+          {
+            "group": "WebSocket",
+            "pages": [
+              "api/websocket/overview",
+              "api/websocket/events"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Real-time video synchronization across multiple users",
+    "No account registration required for basic usage",
+    "Bookmarkable rooms with custom URLs",
+    "Support for YouTube, Vimeo, and direct media files",
+    "Vote mode and vote-to-skip functionality",
+    "Room permissions and user management",
+    "SponsorBlock integration for automatic sponsor skipping",
+    "Text chat and user lists",
+    "Multiple UI themes",
+    "Self-hostable with Docker support"
+  ],
+  "publicApiSurface": [
+    "GET /api/room/list - List public rooms",
+    "POST /api/room/{RoomName}/queue - Add video to queue",
+    "GET /api/room/{RoomName} - Get room details",
+    "POST /api/room/create - Create a new room",
+    "POST /api/data/previewAdd - Preview video metadata",
+    "GET /api/user - Get current user info",
+    "WebSocket /api/room/{RoomName} - Real-time room events",
+    "Room.addToQueue() - Add video to room queue",
+    "Room.playbackStart() - Start playback",
+    "Room.playbackPause() - Pause playback",
+    "Room.skip() - Skip current video",
+    "ClientManager - Manages WebSocket connections",
+    "RoomManager - Manages room lifecycle",
+    "InfoExtractor - Extracts video metadata from URLs"
+  ]
+}
