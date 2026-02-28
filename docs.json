@@ -37,7 +37,8 @@
               "features/video-sync",
               "features/permissions",
               "features/voting",
-              "features/sponsorblock"
+              "features/sponsorblock",
+              "features/chat"
             ]
           },
           {

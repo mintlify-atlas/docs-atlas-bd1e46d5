@@ -1,0 +1,245 @@
+---
+title: Chat
+description: Real-time text chat in synchronized video rooms
+---
+
+OpenTogetherTube includes a built-in chat system that allows users to communicate while watching videos together.
+
+## Overview
+
+The chat feature provides:
+
+- **Real-time messaging** - Messages are instantly delivered to all users in the room
+- **User identification** - Each message shows the sender's username
+- **Persistent history** - Chat messages are stored during the session
+- **Auto-scroll** - Chat automatically scrolls to show new messages
+- **Link support** - URLs in messages are automatically detected and clickable
+
+<Info>
+  Chat messages are not persisted to the database and are cleared when all users leave the room.
+</Info>
+
+## Using Chat
+
+### Opening the Chat
+
+The chat interface is accessible from the room view:
+
+1. Click the chat icon (comment bubble) in the bottom-right corner
+2. The chat panel expands to show recent messages
+3. Type your message in the input field
+4. Press **Enter** to send
+
+### Chat Controls
+
+- **Expand/Collapse** - Click the chevron icon to toggle chat visibility
+- **Scroll to Bottom** - If you've scrolled up, click the down arrow to jump to latest messages
+- **Close** - Click the chevron down icon or click outside the chat to minimize it
+
+## Message Format
+
+Chat messages are sent through the WebSocket connection:
+
+```typescript
+// Sending a chat message (client → server)
+{
+  action: "req",
+  request: {
+    type: "chat",
+    text: "Hello everyone!"
+  }
+}
+```
+
+```typescript
+// Receiving a chat message (server → client)
+{
+  action: "chat",
+  from: {
+    id: 42,
+    name: "username",
+    isYou: false
+  },
+  text: "Hello everyone!"
+}
+```
+
+## Permissions
+
+Chat access is controlled by room permissions:
+
+<ParamField path="chat" type="boolean">
+  Whether users can send chat messages
+</ParamField>
+
+By default, all users have chat permission. Room owners and administrators can restrict chat to specific roles:
+
+- **Owner** - Full chat access
+- **Administrator** - Full chat access
+- **Moderator** - Can be granted or restricted
+- **Trusted User** - Can be granted or restricted
+- **Registered User** - Can be granted or restricted
+- **Unregistered User** - Can be granted or restricted
+
+<Note>
+  See the [Permissions](/features/permissions) documentation for details on managing room permissions.
+</Note>
+
+## Chat Features
+
+### Auto-Scroll Behavior
+
+The chat automatically scrolls to show new messages when:
+
+- A new message arrives
+- The user is already at the bottom of the chat
+- The user clicks the "scroll to bottom" button
+
+Auto-scroll is disabled when the user manually scrolls up to view message history.
+
+### Link Detection
+
+The chat automatically detects URLs in messages and makes them clickable:
+
+```
+https://example.com → clickable link
+www.example.com → clickable link
+```
+
+Links open in a new tab when clicked.
+
+### Recent Message Highlighting
+
+Messages from the last few seconds are highlighted to show activity:
+
+- Recent messages (< 5 seconds) have a subtle highlight
+- The highlight fades as messages age
+- Helps users notice new activity
+
+## Rate Limiting
+
+Chat messages are subject to rate limiting to prevent spam:
+
+- **Default limit**: 5 messages per 10 seconds per user
+- Exceeding the limit results in a temporary chat ban
+- Rate limits are enforced server-side
+
+<Warning>
+  Sending messages too quickly will result in an error message and temporary restriction.
+</Warning>
+
+## Moderation
+
+Room owners and administrators have moderation capabilities:
+
+### User Permissions
+
+Moderators can:
+- Remove chat permission from specific users
+- Restore chat permission
+- Kick users from the room (removes all permissions)
+
+### Room Settings
+
+Chat can be configured at the room level:
+
+- **Enable/Disable Chat** - Toggle chat for the entire room
+- **Permission Requirements** - Restrict chat to specific user roles
+- **Chat History** - Clear chat history (client-side only)
+
+## Implementation Details
+
+The chat system is implemented using:
+
+- **WebSocket messages** for real-time delivery
+- **Vue 3 components** for the UI (`Chat.vue`, `ChatMsg.vue`)
+- **Server-side validation** for message content
+- **Client-side message queue** for display
+
+### Message Validation
+
+The server validates all chat messages:
+
+```typescript
+// Maximum message length
+const MAX_MESSAGE_LENGTH = 500;
+
+// Validation rules
+- Non-empty messages
+- Length ≤ 500 characters
+- User has chat permission
+- Rate limit not exceeded
+```
+
+### Storage
+
+Chat messages are:
+- ✅ Stored in-memory on the server
+- ✅ Synchronized to all connected clients
+- ❌ Not persisted to database
+- ❌ Cleared when room becomes empty
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep messages concise">
+    Messages over 500 characters are rejected. Keep chat messages brief and readable.
+  </Accordion>
+
+  <Accordion title="Use chat for coordination">
+    Chat is ideal for coordinating playback, suggesting videos, and social interaction.
+  </Accordion>
+
+  <Accordion title="Respect rate limits">
+    Avoid sending messages too quickly. The rate limit is designed to prevent spam while allowing natural conversation.
+  </Accordion>
+
+  <Accordion title="Follow community guidelines">
+    Room owners can set their own rules. Be respectful and follow the room's guidelines.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Chat messages not appearing">
+    - Check that you have chat permission in the room
+    - Verify your WebSocket connection is active
+    - Try refreshing the page
+  </Accordion>
+
+  <Accordion title="Can't send messages">
+    - Verify you have the **chat** permission
+    - Check if you've exceeded the rate limit (wait 10 seconds)
+    - Ensure your message is under 500 characters
+  </Accordion>
+
+  <Accordion title="Chat not opening">
+    - Click the comment bubble icon in the bottom-right
+    - Check browser console for JavaScript errors
+    - Try hard-refreshing the page (Ctrl+Shift+R)
+  </Accordion>
+</AccordionGroup>
+
+## API Reference
+
+See the [WebSocket Events](/api/websocket/events) documentation for complete chat message schemas and examples.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Permissions"
+    icon="shield"
+    href="/features/permissions"
+  >
+    Learn how to manage chat permissions and user roles
+  </Card>
+  <Card
+    title="WebSocket API"
+    icon="plug"
+    href="/api/websocket/overview"
+  >
+    Integrate chat into your own application
+  </Card>
+</CardGroup>
