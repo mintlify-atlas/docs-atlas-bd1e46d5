@@ -1,0 +1,344 @@
+---
+title: Contributing Guidelines
+description: How to contribute to OpenTogetherTube
+---
+
+## Welcome Contributors
+
+We appreciate your interest in contributing to OpenTogetherTube! This guide will help you get started with contributing code, documentation, or other improvements.
+
+## Getting Started
+
+Before contributing:
+
+1. Set up your [development environment](/development/setup)
+2. Familiarize yourself with the [architecture](/development/architecture)
+3. Read through the [testing guide](/development/testing)
+4. Check existing issues and pull requests to avoid duplicate work
+
+## Code Style Guidelines
+
+### Formatting with Prettier
+
+We use Prettier for consistent code formatting. Run the linter before committing:
+
+```bash
+yarn lint
+```
+
+**Configuration:**
+- **Indentation:** Tabs (not spaces)
+- **Tab Width:** 4
+- **Print Width:** 100 characters
+- **Semicolons:** Required
+- **Quotes:** Double quotes (no single quotes)
+- **Trailing Commas:** ES5 style
+- **Arrow Functions:** Avoid parentheses when possible
+
+### TypeScript Style
+
+**Modern JavaScript:**
+- Target: ESNext with ES modules
+- Always use `const` or `let`, never `var`
+- Prefer arrow functions over function expressions
+- Use type imports: `import type { Foo } from "bar"`
+
+**Type Safety:**
+- Strict null checks enabled
+- Avoid using `any` - use `unknown` or proper types
+- Use Zod for runtime validation
+- Leverage TypeScript's type inference
+
+**Async/Await:**
+- Prefer `await` over `.then()` chains
+- Always use `try/catch` for async operations
+- Handle errors appropriately
+
+### Rust Style
+
+For Rust code in the `crates/` directory:
+
+```bash
+# Format code
+cargo fmt
+
+# Check for common mistakes
+cargo clippy
+```
+
+**Best Practices:**
+- Follow standard Rust naming conventions
+- Use `anyhow` for error handling
+- Prefer `async/await` over callbacks
+- Add documentation comments for public APIs
+
+### Import Order
+
+Organize imports in the following order:
+
+1. Node.js built-ins (e.g., `node:url`, `node:http`)
+2. External dependencies (e.g., `axios`, `lodash`)
+3. Internal workspace packages (e.g., `ott-common/*`)
+4. Local project imports
+
+**Example:**
+
+```typescript
+import { readFile } from "node:fs/promises";
+import axios from "axios";
+import { Result } from "ott-common/result";
+import { RoomManager } from "./roommanager";
+```
+
+### Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|----------|
+| Files | kebab-case | `room-manager.ts` |
+| Classes | PascalCase | `RoomManager` |
+| Functions/Variables | camelCase | `getVideoInfo` |
+| Constants | UPPER_SNAKE_CASE | `MAX_ROOM_SIZE` |
+| Types/Interfaces | PascalCase | `UserPermissions` |
+
+### Error Handling
+
+**TypeScript:**
+- Use custom exceptions extending `OttException` from `ott-common/exceptions.js`
+- Always wrap async operations in `try/catch`
+- Use Zod for runtime validation with descriptive error messages
+- Log errors with appropriate severity levels
+
+**Example:**
+
+```typescript
+import { OttException } from "ott-common/exceptions";
+
+try {
+	const result = await fetchVideoInfo(url);
+	return result;
+} catch (error) {
+	throw new OttException("Failed to fetch video info", { cause: error });
+}
+```
+
+## Workspace Commands
+
+Run commands in specific workspaces:
+
+```bash
+# General pattern
+yarn workspace <workspace-name> <command>
+
+# Examples
+yarn workspace ott-server build
+yarn workspace ott-client test
+yarn workspace ott-common lint
+```
+
+**Available Workspaces:**
+- `ott-server` - Backend server
+- `ott-client` - Frontend client
+- `ott-common` - Shared code
+- `ott-vis` - Visualization library
+- `ott-vis-panel` - Grafana panel plugin
+- `ott-vis-datasource` - Grafana datasource plugin
+
+## Making Changes
+
+### Branch Strategy
+
+1. Create a feature branch from `master`:
+
+```bash
+git checkout -b feature/your-feature-name
+```
+
+2. Make your changes and commit frequently with clear messages
+3. Keep your branch up to date with `master`
+
+### Commit Messages
+
+Write clear, descriptive commit messages:
+
+**Format:**
+```
+<type>: <description>
+
+[optional body]
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Formatting changes (no code changes)
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks
+
+**Example:**
+```
+feat: add support for Twitch clips
+
+Implements video metadata extraction for Twitch clips using
+the Twitch API. Includes caching and error handling.
+```
+
+### Pull Request Process
+
+1. Ensure all tests pass:
+
+```bash
+yarn test
+yarn lint-ci
+```
+
+2. Update documentation if needed
+3. Push your branch to GitHub
+4. Create a pull request with a clear description:
+   - What changes were made
+   - Why the changes were necessary
+   - Any related issues
+
+**Using GitHub CLI:**
+
+```bash
+# Create PR
+gh pr create --title "Add Twitch clip support" --body "Implements #123"
+
+# View PR status
+gh pr status
+```
+
+### Code Review
+
+- Address review feedback promptly
+- Keep discussions focused and professional
+- Be open to suggestions and alternative approaches
+- Request re-review after making changes
+
+## Testing Your Changes
+
+All changes should include appropriate tests. See the [testing guide](/development/testing) for details.
+
+**Before submitting:**
+
+```bash
+# Run all tests
+yarn test
+
+# Run linter
+yarn lint-ci
+
+# Test your changes manually
+yarn run dev
+```
+
+## Documentation
+
+If your changes affect user-facing features or developer workflows:
+
+- Update relevant documentation
+- Add code comments for complex logic
+- Include JSDoc comments for public APIs
+- Update type definitions if needed
+
+## Reporting Issues
+
+When reporting bugs:
+
+1. Check if the issue already exists
+2. Use a clear, descriptive title
+3. Provide steps to reproduce
+4. Include relevant logs or screenshots
+5. Specify your environment (OS, Node version, etc.)
+
+**Issue Template:**
+
+```markdown
+## Description
+[Clear description of the issue]
+
+## Steps to Reproduce
+1. ...
+2. ...
+3. ...
+
+## Expected Behavior
+[What should happen]
+
+## Actual Behavior
+[What actually happens]
+
+## Environment
+- OS: ...
+- Node version: ...
+- Browser: ...
+```
+
+## Feature Requests
+
+When requesting features:
+
+- Explain the use case
+- Describe the desired behavior
+- Consider implementation complexity
+- Discuss alternatives you've considered
+
+## Community Guidelines
+
+- Be respectful and professional
+- Welcome newcomers and help them get started
+- Focus on constructive feedback
+- Follow the project's code of conduct
+
+## Development Tools
+
+### Recommended VSCode Extensions
+
+- ESLint
+- Prettier
+- Volar (Vue Language Features)
+- rust-analyzer
+- GitLens
+
+### Debugging
+
+**VSCode Launch Configuration:**
+
+The project includes VSCode debug configurations:
+- **Launch Program**: Debug the server
+- **Attach to Process**: Attach to a running Node process
+
+**Debugging Rust:**
+
+```bash
+# With logging
+RUST_LOG=debug cargo run -p ott-balancer-bin
+
+# With tokio console
+cargo run -p ott-balancer-bin --features tokio-console
+```
+
+## License
+
+By contributing to OpenTogetherTube, you agree that your contributions will be licensed under the AGPL-3.0-or-later license.
+
+## Getting Help
+
+If you need help:
+
+- Check existing documentation
+- Search closed issues and PRs
+- Ask in GitHub Discussions
+- Join the community Discord
+
+## Recognition
+
+Contributors are recognized in:
+
+- The project's GitHub contributors page
+- Release notes for significant contributions
+- The project README
+
+Thank you for contributing to OpenTogetherTube!

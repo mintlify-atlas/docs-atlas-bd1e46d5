@@ -1,0 +1,527 @@
+---
+title: Testing Guide
+description: Testing practices and tools for OpenTogetherTube
+---
+
+## Overview
+
+OpenTogetherTube uses a comprehensive testing strategy combining unit tests, component tests, and end-to-end tests to ensure code quality and prevent regressions.
+
+## Testing Stack
+
+### TypeScript/JavaScript
+
+- **Unit Tests:** Vitest
+- **Component Tests:** Cypress with Vue Testing Library
+- **E2E Tests:** Cypress
+- **Mocking:** Vitest mocks, redis-mock
+- **Coverage:** Vitest coverage (v8)
+
+### Rust
+
+- **Unit Tests:** Built-in test framework
+- **Integration Tests:** Harness crate
+- **Benchmarks:** Criterion
+
+## Running Tests
+
+### All Tests
+
+Run all tests across all workspaces:
+
+```bash
+yarn test
+```
+
+### Unit Tests
+
+**Run all unit tests:**
+
+```bash
+# All workspaces
+yarn test
+
+# Specific workspace
+yarn workspace ott-server test
+yarn workspace ott-client test
+yarn workspace ott-common test
+```
+
+**Run specific test file:**
+
+```bash
+yarn workspace ott-server vitest run tests/unit/roommanager.spec.ts
+yarn workspace ott-client vitest run tests/unit/component.spec.ts
+yarn workspace ott-common vitest run tests/unit/result.spec.ts
+```
+
+**Watch mode (interactive):**
+
+```bash
+yarn workspace ott-server vitest
+```
+
+### Component Tests
+
+**Run component tests (Cypress):**
+
+```bash
+# Headless mode
+yarn cy:run:component
+
+# Interactive mode
+yarn cy:open:component
+```
+
+### End-to-End Tests
+
+**Run E2E tests:**
+
+```bash
+# Headless mode
+yarn cy:run
+
+# Interactive mode (recommended for development)
+yarn cy:open
+```
+
+### Rust Tests
+
+**Run Rust tests:**
+
+```bash
+# All Rust tests
+cargo test
+
+# Specific package
+cargo test -p ott-balancer
+cargo test -p ott-common
+
+# With logging
+RUST_LOG=debug cargo test -- --nocapture
+```
+
+**Run benchmarks:**
+
+```bash
+cargo bench
+```
+
+## Test Coverage
+
+### Generating Coverage Reports
+
+**TypeScript:**
+
+```bash
+# Server coverage
+yarn workspace ott-server test
+
+# Client coverage
+yarn workspace ott-client test
+
+# Common coverage
+yarn workspace ott-common test
+```
+
+Coverage reports are generated in the `coverage/` directory of each workspace.
+
+**View HTML coverage report:**
+
+```bash
+open server/coverage/index.html
+open client/coverage/index.html
+```
+
+## Writing Tests
+
+### Test File Organization
+
+**Naming Convention:**
+- Unit tests: `*.spec.ts` or `*.test.ts`
+- Place in `/tests/unit/` directory
+- E2E tests: `/tests/e2e/integration/*.spec.ts`
+
+**Directory Structure:**
+
+```
+server/
+├── tests/
+│   └── unit/
+│       ├── roommanager.spec.ts
+│       ├── infoextractor.spec.ts
+│       └── api/
+│           ├── room.spec.ts
+│           └── user.spec.ts
+```
+
+### Unit Test Patterns
+
+**Basic Structure:**
+
+```typescript
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { RoomManager } from "../roommanager";
+
+describe("RoomManager", () => {
+	let roomManager: RoomManager;
+
+	beforeEach(() => {
+		roomManager = new RoomManager();
+	});
+
+	afterEach(() => {
+		// Cleanup
+	});
+
+	describe("createRoom", () => {
+		it("should create a new room with valid name", () => {
+			const room = roomManager.createRoom("test-room");
+			expect(room).toBeDefined();
+			expect(room.name).toBe("test-room");
+		});
+
+		it("should throw error for invalid room name", () => {
+			expect(() => roomManager.createRoom("")).toThrow();
+		});
+	});
+});
+```
+
+### Mocking Dependencies
+
+**Mocking Redis:**
+
+```typescript
+import { vi } from "vitest";
+import RedisMock from "redis-mock";
+
+// Mock redis module
+vi.mock("redis", () => ({
+	createClient: () => RedisMock.createClient(),
+}));
+```
+
+**Mocking Database:**
+
+```typescript
+import { beforeEach } from "vitest";
+import { sequelize } from "../models";
+
+beforeEach(async () => {
+	// Use SQLite in-memory for tests
+	await sequelize.sync({ force: true });
+});
+```
+
+**Mocking HTTP Requests:**
+
+```typescript
+import { vi } from "vitest";
+import axios from "axios";
+
+vi.mock("axios");
+
+const mockAxios = axios as jest.Mocked<typeof axios>;
+mockAxios.get.mockResolvedValue({
+	data: { title: "Test Video" },
+});
+```
+
+### Component Testing
+
+**Testing Vue Components:**
+
+```typescript
+import { mount } from "@vue/test-utils";
+import { describe, it, expect } from "vitest";
+import VideoPlayer from "../components/VideoPlayer.vue";
+
+describe("VideoPlayer", () => {
+	it("renders video element", () => {
+		const wrapper = mount(VideoPlayer, {
+			props: {
+				src: "https://example.com/video.mp4",
+			},
+		});
+
+		expect(wrapper.find("video").exists()).toBe(true);
+	});
+
+	it("emits play event on play button click", async () => {
+		const wrapper = mount(VideoPlayer);
+		await wrapper.find(".play-button").trigger("click");
+
+		expect(wrapper.emitted()).toHaveProperty("play");
+	});
+});
+```
+
+### E2E Testing
+
+**Cypress Test Example:**
+
+```typescript
+describe("Room Creation", () => {
+	beforeEach(() => {
+		cy.visit("/");
+	});
+
+	it("should create a room and join it", () => {
+		cy.get("[data-cy=create-room-btn]").click();
+		cy.get("[data-cy=room-name-input]").type("Test Room");
+		cy.get("[data-cy=create-btn]").click();
+
+		cy.url().should("include", "/room/");
+		cy.contains("Test Room").should("be.visible");
+	});
+
+	it("should validate room name", () => {
+		cy.get("[data-cy=create-room-btn]").click();
+		cy.get("[data-cy=create-btn]").click();
+
+		cy.contains("Room name is required").should("be.visible");
+	});
+});
+```
+
+**WebSocket Testing:**
+
+```typescript
+it("should sync playback across clients", () => {
+	cy.visit("/room/test");
+
+	// Wait for WebSocket connection
+	cy.window().its("ws").should("exist");
+
+	// Trigger play
+	cy.get("[data-cy=play-btn]").click();
+
+	// Verify WebSocket message sent
+	cy.window()
+		.its("ws.lastMessage")
+		.should("include", '"action":"play"');
+});
+```
+
+### Rust Testing
+
+**Unit Test Example:**
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_room_assignment() {
+        let balancer = LoadBalancer::new();
+        let room_id = "test-room";
+        
+        let server1 = balancer.assign_room(room_id);
+        let server2 = balancer.assign_room(room_id);
+        
+        assert_eq!(server1, server2, "Same room should map to same server");
+    }
+
+    #[tokio::test]
+    async fn test_websocket_proxy() {
+        let proxy = WebSocketProxy::new();
+        let result = proxy.connect("ws://localhost:3000").await;
+        
+        assert!(result.is_ok());
+    }
+}
+```
+
+**Integration Test with Harness:**
+
+```rust
+use harness::TestHarness;
+
+#[tokio::test]
+async fn test_full_room_flow() {
+    let harness = TestHarness::new().await;
+    
+    // Start balancer
+    let balancer = harness.start_balancer().await;
+    
+    // Start monolith
+    let monolith = harness.start_monolith().await;
+    
+    // Create client connection
+    let client = harness.create_client().await;
+    
+    // Test room join
+    client.join_room("test-room").await.unwrap();
+    
+    // Verify connection routed correctly
+    assert_eq!(balancer.room_assignments["test-room"], monolith.id);
+}
+```
+
+## Test Database Setup
+
+Before running tests, initialize the test database:
+
+```bash
+NODE_ENV=test yarn workspace ott-server run sequelize-cli db:migrate
+```
+
+This only needs to be done once, or after schema changes.
+
+## Continuous Integration
+
+### Pre-commit Checks
+
+Run before committing:
+
+```bash
+# Lint all code
+yarn lint-ci
+
+# Run all tests
+yarn test
+
+# Check TypeScript
+yarn workspace ott-server run tsc --noEmit
+yarn workspace ott-client run tsc --noEmit
+```
+
+### CI Pipeline
+
+The GitHub Actions CI pipeline runs:
+
+1. Linting (ESLint, Prettier)
+2. TypeScript compilation
+3. Unit tests with coverage
+4. Component tests
+5. E2E tests
+6. Rust tests and clippy
+
+## Best Practices
+
+### Test Independence
+
+- Each test should be independent
+- Use `beforeEach` to set up clean state
+- Use `afterEach` to clean up resources
+- Avoid shared mutable state between tests
+
+### Test Coverage Goals
+
+- **Critical Paths:** 100% coverage
+- **Business Logic:** >90% coverage
+- **UI Components:** >80% coverage
+- **Utilities:** >95% coverage
+
+### What to Test
+
+**Do Test:**
+- Business logic and algorithms
+- API endpoints and request validation
+- Error handling and edge cases
+- State management and data flow
+- Critical user interactions
+
+**Don't Test:**
+- Third-party library internals
+- Simple getters/setters without logic
+- Configuration files
+- Type definitions alone
+
+### Mocking Strategy
+
+- Mock external dependencies (APIs, databases)
+- Use real implementations for internal modules when practical
+- Keep mocks simple and focused
+- Update mocks when APIs change
+
+### Test Performance
+
+- Keep unit tests fast (less than 100ms each)
+- Use parallel test execution
+- Mock slow operations (network, file I/O)
+- Use in-memory databases for tests
+
+## Debugging Tests
+
+### Debugging Vitest Tests
+
+```bash
+# Run with debug logging
+DEBUG=* yarn workspace ott-server vitest
+
+# Run single test in watch mode
+yarn workspace ott-server vitest --watch roommanager.spec.ts
+```
+
+### Debugging Cypress Tests
+
+```bash
+# Open Cypress with debug tools
+yarn cy:open
+
+# Enable verbose logging
+DEBUG=cypress:* yarn cy:run
+```
+
+### VSCode Debugging
+
+Use the VSCode debugger with breakpoints:
+
+1. Set breakpoints in test files
+2. Run "Debug: JavaScript Debug Terminal"
+3. Run test command in the debug terminal
+
+## Common Testing Patterns
+
+### Testing Async Code
+
+```typescript
+it("should fetch video metadata", async () => {
+	const metadata = await infoExtractor.getVideoInfo("https://youtube.com/watch?v=123");
+	expect(metadata.title).toBe("Test Video");
+});
+```
+
+### Testing Errors
+
+```typescript
+it("should throw error for invalid URL", async () => {
+	await expect(infoExtractor.getVideoInfo("invalid")).rejects.toThrow(
+		"Invalid URL"
+	);
+});
+```
+
+### Testing Events
+
+```typescript
+it("should emit room update event", (done) => {
+	room.on("update", (data) => {
+		expect(data.state).toBe("playing");
+		done();
+	});
+
+	room.play();
+});
+```
+
+### Snapshot Testing
+
+```typescript
+it("should render correctly", () => {
+	const wrapper = mount(VideoPlayer);
+	expect(wrapper.html()).toMatchSnapshot();
+});
+```
+
+## Resources
+
+- [Vitest Documentation](https://vitest.dev/)
+- [Cypress Documentation](https://docs.cypress.io/)
+- [Vue Test Utils](https://test-utils.vuejs.org/)
+- [Rust Testing](https://doc.rust-lang.org/book/ch11-00-testing.html)
+
+Happy Testing!

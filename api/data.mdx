@@ -1,0 +1,417 @@
+---
+title: Data Endpoints
+description: REST API endpoints for retrieving metadata and system data
+---
+
+Data endpoints provide metadata about permissions, roles, and video information.
+
+## Preview Add
+
+### GET /api/data/previewAdd
+
+Get a preview of videos before adding them to a queue. This endpoint accepts URLs or search queries and returns video metadata.
+
+**Query Parameters**
+
+<ParamField query="input" type="string" required>
+  Video URL or search query
+</ParamField>
+
+<ParamField query="adapter" type="string">
+  Force a specific service adapter (e.g., `youtube`, `vimeo`)
+</ParamField>
+
+```bash
+curl "https://opentogethertube.com/api/data/previewAdd?input=https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+**Response**
+
+<ResponseField name="success" type="boolean">
+  Operation status
+</ResponseField>
+
+<ResponseField name="result" type="array">
+  Array of video objects
+</ResponseField>
+
+<ResponseField name="result[].service" type="string">
+  Video service (e.g., `youtube`)
+</ResponseField>
+
+<ResponseField name="result[].id" type="string">
+  Video ID
+</ResponseField>
+
+<ResponseField name="result[].title" type="string">
+  Video title
+</ResponseField>
+
+<ResponseField name="result[].description" type="string">
+  Video description
+</ResponseField>
+
+<ResponseField name="result[].thumbnail" type="string">
+  Thumbnail URL
+</ResponseField>
+
+<ResponseField name="result[].length" type="number">
+  Video duration in seconds
+</ResponseField>
+
+<ResponseField name="result[].mime" type="string">
+  MIME type (for direct media)
+</ResponseField>
+
+<ResponseField name="highlighted" type="number">
+  Index of the highlighted result (for search queries)
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "result": [
+    {
+      "service": "youtube",
+      "id": "dQw4w9WgXcQ",
+      "title": "Rick Astley - Never Gonna Give You Up (Official Video)",
+      "description": "The official video for Never Gonna Give You Up...",
+      "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg",
+      "length": 213
+    }
+  ]
+}
+```
+
+### Search Query Example
+
+```bash
+curl "https://opentogethertube.com/api/data/previewAdd?input=never+gonna+give+you+up"
+```
+
+```json
+{
+  "success": true,
+  "result": [
+    {
+      "service": "youtube",
+      "id": "dQw4w9WgXcQ",
+      "title": "Rick Astley - Never Gonna Give You Up (Official Video)",
+      "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg",
+      "length": 213
+    },
+    {
+      "service": "youtube",
+      "id": "another-id",
+      "title": "Another Result",
+      "thumbnail": "https://i.ytimg.com/vi/another-id/default.jpg",
+      "length": 180
+    }
+  ],
+  "highlighted": 0
+}
+```
+
+### Playlist URL Example
+
+```bash
+curl "https://opentogethertube.com/api/data/previewAdd?input=https://www.youtube.com/playlist?list=PLx..."
+```
+
+Returns all videos in the playlist:
+
+```json
+{
+  "success": true,
+  "result": [
+    {
+      "service": "youtube",
+      "id": "video1",
+      "title": "First Video",
+      "length": 300
+    },
+    {
+      "service": "youtube",
+      "id": "video2",
+      "title": "Second Video",
+      "length": 250
+    }
+  ]
+}
+```
+
+<Info>
+**Rate Limits:**
+- URL input: 5 points
+- Search query: 75 points (15x multiplier)
+
+Cache-Control headers are set on successful responses for client-side caching.
+</Info>
+
+### Error Responses
+
+**Missing Input**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "BadApiArgumentException",
+    "message": "Missing or invalid argument",
+    "arg": "input",
+    "reason": "missing"
+  }
+}
+```
+
+**Unsupported Service**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "UnsupportedServiceException",
+    "message": "This video service is not supported"
+  }
+}
+```
+
+**Video Not Found**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "VideoNotFoundException",
+    "message": "Video not found"
+  }
+}
+```
+
+**Invalid Video ID**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "InvalidVideoIdException",
+    "message": "Invalid video ID format"
+  }
+}
+```
+
+**Out of Quota**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "OutOfQuotaException",
+    "message": "API quota exceeded. Try again later."
+  }
+}
+```
+
+## Permissions Data
+
+### GET /api/data/permissions
+
+Get information about roles and permissions in the system.
+
+```bash
+curl https://opentogethertube.com/api/data/permissions
+```
+
+**Response**
+
+<ResponseField name="roles" type="array">
+  Array of role definitions
+</ResponseField>
+
+<ResponseField name="roles[].id" type="number">
+  Role ID
+</ResponseField>
+
+<ResponseField name="roles[].name" type="string">
+  Internal role name
+</ResponseField>
+
+<ResponseField name="roles[].display" type="string">
+  Display name for the role
+</ResponseField>
+
+<ResponseField name="permissions" type="array">
+  Array of permission definitions
+</ResponseField>
+
+<ResponseField name="permissions[].name" type="string">
+  Permission name
+</ResponseField>
+
+<ResponseField name="permissions[].mask" type="number">
+  Permission bitmask
+</ResponseField>
+
+<ResponseField name="permissions[].minRole" type="number">
+  Minimum role ID required for this permission
+</ResponseField>
+
+```json
+{
+  "roles": [
+    {
+      "id": 0,
+      "name": "unregistered",
+      "display": "Unregistered User"
+    },
+    {
+      "id": 1,
+      "name": "registered",
+      "display": "Registered User"
+    },
+    {
+      "id": 2,
+      "name": "trusted",
+      "display": "Trusted User"
+    },
+    {
+      "id": 3,
+      "name": "mod",
+      "display": "Moderator"
+    },
+    {
+      "id": 4,
+      "name": "admin",
+      "display": "Administrator"
+    },
+    {
+      "id": 5,
+      "name": "owner",
+      "display": "Owner"
+    }
+  ],
+  "permissions": [
+    {
+      "name": "playback.play-pause",
+      "mask": 1,
+      "minRole": 0
+    },
+    {
+      "name": "playback.skip",
+      "mask": 2,
+      "minRole": 0
+    },
+    {
+      "name": "playback.seek",
+      "mask": 4,
+      "minRole": 0
+    },
+    {
+      "name": "manage-queue.add",
+      "mask": 8,
+      "minRole": 0
+    },
+    {
+      "name": "manage-queue.remove",
+      "mask": 16,
+      "minRole": 0
+    },
+    {
+      "name": "manage-queue.order",
+      "mask": 32,
+      "minRole": 0
+    },
+    {
+      "name": "manage-queue.vote",
+      "mask": 64,
+      "minRole": 0
+    },
+    {
+      "name": "chat",
+      "mask": 128,
+      "minRole": 0
+    },
+    {
+      "name": "configure-room.set-title",
+      "mask": 256,
+      "minRole": 0
+    },
+    {
+      "name": "configure-room.set-description",
+      "mask": 512,
+      "minRole": 0
+    },
+    {
+      "name": "manage-users.promote-trusted-user",
+      "mask": 1048576,
+      "minRole": 2
+    },
+    {
+      "name": "manage-users.kick",
+      "mask": 16777216,
+      "minRole": 2
+    },
+    {
+      "name": "manage-queue.play-now",
+      "mask": 33554432,
+      "minRole": 0
+    }
+  ]
+}
+```
+
+### Understanding Permissions
+
+Permissions are represented as bitmasks. A role's permission mask is the sum of all permissions granted to that role.
+
+For example:
+- `playback.play-pause` = 1
+- `playback.skip` = 2
+- `playback.seek` = 4
+
+If a role has permissions for all three: `1 + 2 + 4 = 7` (permission mask)
+
+### Permission Categories
+
+**Playback Control**
+- `playback.play-pause` - Play/pause video
+- `playback.skip` - Skip to next video
+- `playback.seek` - Seek within video
+- `playback.speed` - Change playback speed
+
+**Queue Management**
+- `manage-queue.add` - Add videos to queue
+- `manage-queue.remove` - Remove videos from queue
+- `manage-queue.order` - Reorder queue
+- `manage-queue.vote` - Vote for videos
+- `manage-queue.play-now` - Play a video immediately
+
+**Room Configuration**
+- `configure-room.set-title` - Change room title
+- `configure-room.set-description` - Change room description
+- `configure-room.set-visibility` - Change room visibility
+- `configure-room.set-queue-mode` - Change queue mode
+- `configure-room.set-permissions.*` - Modify role permissions
+- `configure-room.other` - Other room settings
+
+**User Management**
+- `manage-users.promote-*` - Promote users to roles
+- `manage-users.demote-*` - Demote users from roles
+- `manage-users.kick` - Kick users from room
+
+**Communication**
+- `chat` - Send chat messages
+
+## Supported Video Services
+
+The following video services are supported:
+
+- YouTube
+- Vimeo
+- Dailymotion
+- Direct video URLs (MP4, WebM, etc.)
+- And more...
+
+<Info>
+Service availability may vary based on server configuration and API quotas.
+</Info>

@@ -1,0 +1,801 @@
+---
+title: WebSocket Events
+description: Complete reference for WebSocket messages and room requests
+---
+
+This page documents all WebSocket events and room requests used in OpenTogetherTube.
+
+## Server Messages
+
+Messages sent from the server to connected clients.
+
+### Sync
+
+Synchronize room state with clients. Sent when room properties change.
+
+**Message Format**
+
+```json
+{
+  "action": "sync",
+  "name": "room-name",
+  "title": "Room Title",
+  "description": "Room description",
+  "isTemporary": false,
+  "visibility": "public",
+  "queueMode": "manual",
+  "isPlaying": true,
+  "playbackPosition": 42.5,
+  "playbackSpeed": 1.0,
+  "currentSource": {
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ",
+    "title": "Video Title",
+    "length": 213
+  },
+  "queue": [
+    {
+      "service": "youtube",
+      "id": "next-video",
+      "title": "Next Video",
+      "length": 180
+    }
+  ],
+  "grants": [[0, 255], [1, 511]],
+  "hasOwner": true,
+  "voteCounts": [["youtube:dQw4w9WgXcQ", 5]],
+  "enableVoteSkip": false,
+  "votesToSkip": [],
+  "videoSegments": [],
+  "autoSkipSegmentCategories": ["sponsor", "intro"]
+}
+```
+
+**Fields**
+
+<ResponseField name="action" type="string">
+  Always `"sync"`
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Room name/identifier
+</ResponseField>
+
+<ResponseField name="isPlaying" type="boolean">
+  Whether video is currently playing
+</ResponseField>
+
+<ResponseField name="playbackPosition" type="number">
+  Current playback position in seconds
+</ResponseField>
+
+<ResponseField name="playbackSpeed" type="number">
+  Playback speed multiplier (default: 1.0)
+</ResponseField>
+
+<ResponseField name="currentSource" type="object|null">
+  Currently playing video
+</ResponseField>
+
+<ResponseField name="queue" type="array">
+  Array of queued videos
+</ResponseField>
+
+<ResponseField name="grants" type="array">
+  Permission grants as `[role, mask]` pairs
+</ResponseField>
+
+<ResponseField name="voteCounts" type="array">
+  Vote counts as `["service:id", count]` pairs
+</ResponseField>
+
+<ResponseField name="videoSegments" type="array">
+  SponsorBlock segments for current video
+</ResponseField>
+
+### Event
+
+Notify clients of user actions (e.g., video added, playback changed).
+
+**Message Format**
+
+```json
+{
+  "action": "event",
+  "request": {
+    "type": 5,
+    "video": {
+      "service": "youtube",
+      "id": "dQw4w9WgXcQ"
+    }
+  },
+  "user": {
+    "name": "Username",
+    "isLoggedIn": true
+  },
+  "additional": {
+    "video": {
+      "service": "youtube",
+      "id": "dQw4w9WgXcQ",
+      "title": "Video Title",
+      "length": 213
+    }
+  }
+}
+```
+
+**Fields**
+
+<ResponseField name="action" type="string">
+  Always `"event"`
+</ResponseField>
+
+<ResponseField name="request" type="object">
+  The original room request that triggered this event
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  User who performed the action
+</ResponseField>
+
+<ResponseField name="additional" type="object">
+  Extra context about the event (varies by request type)
+</ResponseField>
+
+### Event Custom
+
+System-generated events with custom messages.
+
+```json
+{
+  "action": "eventcustom",
+  "text": "Skipped sponsor",
+  "duration": 3000
+}
+```
+
+<ResponseField name="text" type="string">
+  Event message
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Display duration in milliseconds (optional)
+</ResponseField>
+
+### Chat
+
+Chat message from a user.
+
+```json
+{
+  "action": "chat",
+  "from": {
+    "id": "client-123",
+    "name": "Username",
+    "isLoggedIn": true,
+    "status": "ready",
+    "role": 2
+  },
+  "text": "Hello everyone!"
+}
+```
+
+<ResponseField name="from" type="object">
+  User who sent the message
+</ResponseField>
+
+<ResponseField name="text" type="string">
+  Chat message content
+</ResponseField>
+
+### User
+
+User join, leave, or update notification.
+
+**User Joined/Updated**
+
+```json
+{
+  "action": "user",
+  "update": {
+    "kind": "update",
+    "value": {
+      "id": "client-123",
+      "name": "Username",
+      "isLoggedIn": true,
+      "status": "ready",
+      "role": 2
+    }
+  }
+}
+```
+
+**User Left**
+
+```json
+{
+  "action": "user",
+  "update": {
+    "kind": "remove",
+    "value": "client-123"
+  }
+}
+```
+
+**Initial User List**
+
+```json
+{
+  "action": "user",
+  "update": {
+    "kind": "init",
+    "value": [
+      {
+        "id": "client-123",
+        "name": "User1",
+        "isLoggedIn": true,
+        "status": "ready",
+        "role": 2
+      },
+      {
+        "id": "client-456",
+        "name": "User2",
+        "isLoggedIn": false,
+        "status": "ready",
+        "role": 0
+      }
+    ]
+  }
+}
+```
+
+### You
+
+Server sends your client ID after authentication.
+
+```json
+{
+  "action": "you",
+  "info": {
+    "id": "client-123-abc"
+  }
+}
+```
+
+<ResponseField name="info.id" type="string">
+  Your unique client identifier
+</ResponseField>
+
+### Announcement
+
+Server-wide announcement message.
+
+```json
+{
+  "action": "announcement",
+  "text": "Server maintenance in 30 minutes"
+}
+```
+
+### Unload
+
+Room is being unloaded. Clients should disconnect.
+
+```json
+{
+  "action": "unload"
+}
+```
+
+## Client Messages
+
+Messages sent from clients to the server.
+
+### Authenticate
+
+```json
+{
+  "action": "auth",
+  "token": "YOUR_AUTH_TOKEN"
+}
+```
+
+### Player Status
+
+```json
+{
+  "action": "status",
+  "status": 2
+}
+```
+
+**Status Values**
+
+- `0` - none (no player loaded)
+- `1` - buffering
+- `2` - ready
+- `3` - error
+
+### Kick Me
+
+Request to be kicked from the room (leave).
+
+```json
+{
+  "action": "kickme",
+  "reason": 0
+}
+```
+
+### Notify
+
+Notify server of client-side changes.
+
+```json
+{
+  "action": "notify",
+  "message": "usernameChanged"
+}
+```
+
+### Room Request
+
+Perform an action in the room.
+
+```json
+{
+  "action": "req",
+  "request": {
+    "type": 5,
+    "video": {
+      "service": "youtube",
+      "id": "dQw4w9WgXcQ"
+    }
+  }
+}
+```
+
+## Room Requests
+
+Room requests are actions performed within a room, sent via the `req` client message.
+
+### Join Request
+
+Join a room.
+
+```json
+{
+  "type": 0,
+  "info": {
+    "id": "client-123",
+    "username": "MyUsername",
+    "status": 2
+  }
+}
+```
+
+<ParamField body="type" type="number">
+  `0` (RoomRequestType.JoinRequest)
+</ParamField>
+
+<ParamField body="info.id" type="string">
+  Your client ID (from `you` message)
+</ParamField>
+
+<ParamField body="info.username" type="string">
+  Your display name
+</ParamField>
+
+<ParamField body="info.status" type="number">
+  Player status
+</ParamField>
+
+### Leave Request
+
+Leave the room.
+
+```json
+{
+  "type": 1
+}
+```
+
+### Playback Request
+
+Play or pause the video.
+
+```json
+{
+  "type": 2,
+  "state": true
+}
+```
+
+<ParamField body="state" type="boolean">
+  `true` to play, `false` to pause
+</ParamField>
+
+### Skip Request
+
+Skip to the next video (or vote to skip if vote-skip is enabled).
+
+```json
+{
+  "type": 3
+}
+```
+
+### Seek Request
+
+Seek to a specific position.
+
+```json
+{
+  "type": 4,
+  "value": 42.5
+}
+```
+
+<ParamField body="value" type="number">
+  Position in seconds
+</ParamField>
+
+### Add Request
+
+Add video(s) to the queue.
+
+**Single Video**
+
+```json
+{
+  "type": 5,
+  "video": {
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ"
+  }
+}
+```
+
+**Multiple Videos**
+
+```json
+{
+  "type": 5,
+  "videos": [
+    {"service": "youtube", "id": "dQw4w9WgXcQ"},
+    {"service": "youtube", "id": "jNQXAC9IVRw"}
+  ]
+}
+```
+
+**By URL**
+
+```json
+{
+  "type": 5,
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+}
+```
+
+### Remove Request
+
+Remove a video from the queue.
+
+```json
+{
+  "type": 6,
+  "video": {
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ"
+  }
+}
+```
+
+### Order Request
+
+Reorder the queue.
+
+```json
+{
+  "type": 7,
+  "fromIdx": 0,
+  "toIdx": 3
+}
+```
+
+<ParamField body="fromIdx" type="number">
+  Source index
+</ParamField>
+
+<ParamField body="toIdx" type="number">
+  Destination index
+</ParamField>
+
+### Vote Request
+
+Vote for a video in the queue.
+
+```json
+{
+  "type": 8,
+  "video": {
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ"
+  },
+  "add": true
+}
+```
+
+<ParamField body="add" type="boolean">
+  `true` to add vote, `false` to remove vote
+</ParamField>
+
+### Promote Request
+
+Promote/demote a user's role.
+
+```json
+{
+  "type": 9,
+  "targetClientId": "client-456",
+  "role": 2
+}
+```
+
+<ParamField body="targetClientId" type="string">
+  Client ID of user to promote
+</ParamField>
+
+<ParamField body="role" type="number">
+  New role ID (0-5)
+</ParamField>
+
+### Update User
+
+Update user information.
+
+```json
+{
+  "type": 10,
+  "info": {
+    "id": "client-123",
+    "username": "NewUsername",
+    "status": 2
+  }
+}
+```
+
+### Chat Request
+
+Send a chat message.
+
+```json
+{
+  "type": 11,
+  "text": "Hello everyone!"
+}
+```
+
+### Undo Request
+
+Undo a previous action.
+
+```json
+{
+  "type": 12,
+  "event": {
+    "action": "event",
+    "request": { /* original request */ },
+    "user": { /* user info */ },
+    "additional": { /* event context */ }
+  }
+}
+```
+
+<ParamField body="event" type="object">
+  The event message to undo
+</ParamField>
+
+### Apply Settings Request
+
+Change room settings.
+
+```json
+{
+  "type": 13,
+  "settings": {
+    "title": "New Title",
+    "queueMode": "vote",
+    "autoSkipSegmentCategories": ["sponsor", "intro"],
+    "enableVoteSkip": true
+  }
+}
+```
+
+### Play Now Request
+
+Play a video immediately, pushing current video to queue.
+
+```json
+{
+  "type": 14,
+  "video": {
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ"
+  }
+}
+```
+
+### Shuffle Request
+
+Shuffle the queue.
+
+```json
+{
+  "type": 15
+}
+```
+
+### Playback Speed Request
+
+Change playback speed.
+
+```json
+{
+  "type": 16,
+  "speed": 1.5
+}
+```
+
+<ParamField body="speed" type="number">
+  Playback speed (0.25 - 2.0)
+</ParamField>
+
+### Restore Queue Request
+
+Restore or discard the previous queue.
+
+```json
+{
+  "type": 17,
+  "discard": false
+}
+```
+
+<ParamField body="discard" type="boolean">
+  `true` to discard, `false` to restore
+</ParamField>
+
+### Kick Request
+
+Kick a user from the room.
+
+```json
+{
+  "type": 18,
+  "clientId": "client-456"
+}
+```
+
+<ParamField body="clientId" type="string">
+  Client ID of user to kick
+</ParamField>
+
+## RoomRequestType Enum
+
+```typescript
+enum RoomRequestType {
+  JoinRequest = 0,
+  LeaveRequest = 1,
+  PlaybackRequest = 2,
+  SkipRequest = 3,
+  SeekRequest = 4,
+  AddRequest = 5,
+  RemoveRequest = 6,
+  OrderRequest = 7,
+  VoteRequest = 8,
+  PromoteRequest = 9,
+  UpdateUser = 10,
+  ChatRequest = 11,
+  UndoRequest = 12,
+  ApplySettingsRequest = 13,
+  PlayNowRequest = 14,
+  ShuffleRequest = 15,
+  PlaybackSpeedRequest = 16,
+  RestoreQueueRequest = 17,
+  KickRequest = 18
+}
+```
+
+## Example: Complete Client Implementation
+
+```javascript
+class OTTClient {
+  constructor(serverUrl, token) {
+    this.serverUrl = serverUrl;
+    this.token = token;
+    this.ws = null;
+    this.clientId = null;
+  }
+  
+  connect() {
+    this.ws = new WebSocket(this.serverUrl);
+    
+    this.ws.onopen = () => {
+      this.authenticate();
+    };
+    
+    this.ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      this.handleMessage(msg);
+    };
+  }
+  
+  authenticate() {
+    this.send({ action: 'auth', token: this.token });
+  }
+  
+  handleMessage(msg) {
+    switch (msg.action) {
+      case 'you':
+        this.clientId = msg.info.id;
+        console.log('Got client ID:', this.clientId);
+        break;
+      
+      case 'sync':
+        console.log('Room state:', msg);
+        break;
+      
+      case 'event':
+        console.log('User action:', msg);
+        break;
+      
+      case 'chat':
+        console.log(`${msg.from.name}: ${msg.text}`);
+        break;
+    }
+  }
+  
+  joinRoom(roomName) {
+    this.send({
+      action: 'req',
+      request: {
+        type: 0, // JoinRequest
+        info: {
+          id: this.clientId,
+          username: 'Guest',
+          status: 2 // ready
+        }
+      }
+    });
+  }
+  
+  addVideo(service, id) {
+    this.send({
+      action: 'req',
+      request: {
+        type: 5, // AddRequest
+        video: { service, id }
+      }
+    });
+  }
+  
+  sendChat(text) {
+    this.send({
+      action: 'req',
+      request: {
+        type: 11, // ChatRequest
+        text
+      }
+    });
+  }
+  
+  send(data) {
+    this.ws.send(JSON.stringify(data));
+  }
+}
+
+// Usage
+const client = new OTTClient('wss://opentogethertube.com/', 'YOUR_TOKEN');
+client.connect();
+```

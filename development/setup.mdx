@@ -1,0 +1,246 @@
+---
+title: Development Setup
+description: Set up your local development environment for OpenTogetherTube
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js**: Version 20-22 (we recommend using [nvm](https://github.com/nvm-sh/nvm) to manage Node versions)
+- **Yarn**: Version 4 (package manager)
+- **Redis**: For storing room state and user sessions
+- **Rust toolchain**: Required for building the load balancer (optional for monolith-only development)
+- **Git**: For version control
+- **GitHub CLI**: Recommended for creating pull requests
+
+## Setup Methods
+
+There are two ways to set up your development environment:
+
+1. **Local machine setup** (recommended) - Faster and more responsive
+2. **Dev containers** - Isolated environment using Docker
+
+<AccordionGroup>
+  <Accordion title="Local Machine Setup">
+
+### Linux/WSL Dependencies
+
+If you're using Ubuntu or a Debian-based system, install the required system dependencies:
+
+```bash
+sudo apt-get install --no-install-recommends build-essential ca-certificates \
+  apt-utils libsqlite3-dev libpq-dev libnss3 libnspr4 libatk1.0-0 \
+  libatk-bridge2.0-0 libcups2 libdrm2 libdbus-1-3 libatspi2.0-0 libx11-6 \
+  libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libxcb1 \
+  libxkbcommon0 libpango-1.0-0 libcairo2 libasound2 libsodium-dev libtool-bin \
+  libtool pkg-config autoconf
+```
+
+### Installation Steps
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/dyc3/opentogethertube.git
+cd opentogethertube
+```
+
+2. Enable Yarn and install dependencies:
+
+```bash
+corepack enable
+yarn set version stable
+yarn
+```
+
+3. Copy the example configuration file:
+
+```bash
+cp env/example.toml env/development.toml
+```
+
+4. **(Optional)** Add API keys to `env/development.toml`:
+
+   - Create a project on [Google Cloud Console](https://console.cloud.google.com)
+   - Enable "YouTube Data API v3" and "Google Drive API"
+   - Obtain API keys and add them to your configuration file
+
+5. Initialize the database:
+
+```bash
+yarn workspace ott-server run sequelize-cli db:migrate
+```
+
+6. Install and start Redis:
+
+```bash
+# On Ubuntu/Debian
+sudo apt-get install redis-server
+sudo systemctl start redis
+
+# On macOS
+brew install redis
+brew services start redis
+```
+
+  </Accordion>
+  <Accordion title="Dev Container Setup">
+
+Using Visual Studio Code and Docker, you can set up a consistent development environment:
+
+1. Install VSCode and Docker
+2. Install the Dev Containers extension: `ms-vscode-remote.remote-containers`
+3. Open the project in VSCode
+4. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) and run **Dev Containers: Reopen in Container**
+5. Follow steps 3-6 from the Local Machine Setup above
+
+  </Accordion>
+</AccordionGroup>
+
+## Running the Application
+
+OpenTogetherTube has two main components that run simultaneously:
+
+### Development Mode
+
+**Linux/macOS:**
+```bash
+yarn run dev
+```
+
+**Windows:**
+```bash
+yarn run dev-windows
+```
+
+This runs both the client (on port 8080) and the server concurrently.
+
+### Running Components Separately
+
+For debugging with breakpoints:
+
+**Server:**
+- Using VSCode: `Debug > Select "Launch Program" > Start`
+- Or manually: `yarn workspace ott-server debug`
+
+**Client:**
+```bash
+yarn workspace ott-client serve
+```
+
+## Monorepo Structure
+
+The project uses Yarn workspaces with the following structure:
+
+```
+opentogethertube/
+├── client/          # Vue 3 frontend (Vite)
+├── server/          # Node.js/Express backend (monolith)
+├── common/          # Shared TypeScript code
+├── crates/          # Rust workspace
+│   ├── ott-balancer/         # Load balancer library
+│   ├── ott-balancer-bin/     # Balancer executable
+│   ├── ott-balancer-protocol/# Protocol definitions
+│   ├── ott-collector/        # Metrics collection
+│   ├── ott-common/           # Shared Rust utilities
+│   └── harness/              # Integration test harness
+└── packages/        # Grafana visualization plugins
+```
+
+## Building the Project
+
+### TypeScript/JavaScript
+
+```bash
+# Build all workspaces
+yarn build
+
+# Build specific workspace
+yarn workspace ott-server build
+yarn workspace ott-client build
+yarn workspace ott-common build
+```
+
+### Rust (Load Balancer)
+
+```bash
+# Build all Rust crates
+cargo build
+
+# Build the balancer binary
+cargo build -p ott-balancer-bin
+
+# Run the balancer
+cargo run -p ott-balancer-bin -- --config env/balancer.toml
+```
+
+## Database Management
+
+### Running Migrations
+
+```bash
+# Run all pending migrations
+yarn db:migrate
+
+# Undo the last migration
+yarn db:migrate:undo
+```
+
+### Test Database Setup
+
+Before running tests, initialize the test database:
+
+```bash
+NODE_ENV=test yarn workspace ott-server run sequelize-cli db:migrate
+```
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Redis Connection Error">
+
+If you see connection errors, ensure Redis is running:
+
+```bash
+# Check Redis status
+sudo systemctl status redis
+
+# Start Redis
+sudo systemctl start redis
+```
+
+  </Accordion>
+  <Accordion title="Port Already in Use">
+
+If port 8080 or 3000 is already in use, you can change the port:
+
+```bash
+# For the client
+PORT=8081 yarn workspace ott-client serve
+```
+
+  </Accordion>
+  <Accordion title="Dependency Installation Issues">
+
+If you encounter issues installing dependencies:
+
+```bash
+# Clear yarn cache
+yarn cache clean
+
+# Remove node_modules and reinstall
+rm -rf node_modules
+yarn
+```
+
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that your environment is set up:
+
+- Learn about the [system architecture](/development/architecture)
+- Read the [contribution guidelines](/development/contributing)
+- Explore [testing practices](/development/testing)

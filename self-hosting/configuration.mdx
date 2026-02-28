@@ -1,0 +1,360 @@
+---
+title: "Configuration Options"
+description: "Complete reference for all OpenTogetherTube configuration options"
+---
+
+## Configuration Files
+
+OTT is configured using TOML files located in the `env/` directory. The configuration system loads files in the following order:
+
+1. **Base configuration**: `env/base.toml` (always loaded)
+2. **Environment-specific**: `env/<NODE_ENV>.toml` (e.g., `env/production.toml`)
+3. **Environment variables**: Override any config option
+
+<Tip>
+Start by copying the example configuration:
+```bash
+cp env/example.toml env/production.toml
+```
+</Tip>
+
+## Required Configuration
+
+These settings must be configured for production deployment:
+
+### Hostname
+
+```toml
+hostname = "example.com:8080"
+```
+
+The domain name where your server is running. Include the port if not using standard HTTP/HTTPS ports.
+
+**Environment variable**: `OTT_HOSTNAME`
+
+### Session Secret
+
+```toml
+session_secret = "your-secure-random-string-at-least-80-characters-long"
+```
+
+<Warning>
+Must be at least 80 characters long. Use a password generator to create a secure alphanumeric secret.
+</Warning>
+
+**Environment variable**: `SESSION_SECRET`
+
+### API Key
+
+```toml
+api_key = "your-api-key-at-least-40-characters"
+```
+
+Required for performing admin tasks. Must be at least 40 characters.
+
+**Environment variable**: `OPENTOGETHERTUBE_API_KEY`
+
+### YouTube API Key
+
+```toml
+[info_extractor.youtube]
+api_key = "your-youtube-api-key"
+```
+
+Obtain from [Google Cloud Console](https://console.cloud.google.com). Required for YouTube video functionality.
+
+**Environment variable**: `YOUTUBE_API_KEY`
+
+## Server Configuration
+
+### Port
+
+```toml
+port = 3000
+```
+
+The port the server listens on. Default: `3000`
+
+**Environment variable**: `PORT`
+
+### Base URL
+
+```toml
+base_url = "/ott"
+```
+
+Base path for the application if not serving from root. Default: `""`
+
+**Environment variable**: `OTT_BASE_URL`
+
+### Logging
+
+```toml
+[log]
+level = "info"  # Options: silly, debug, info, warn, error
+file = "/var/log/ott.log"  # Optional: log to file
+```
+
+**Environment variables**: `LOG_LEVEL`, `LOG_FILE`
+
+### Trust Proxy
+
+```toml
+trust_proxy = 1
+```
+
+Number of reverse proxy layers to trust for IP addresses. Important for rate limiting and security.
+
+**Environment variable**: `TRUST_PROXY`
+
+## Database Configuration
+
+See the [Database Configuration](/self-hosting/database) guide for detailed PostgreSQL and SQLite setup.
+
+```toml
+[db]
+mode = "postgres"  # Options: postgres, sqlite
+host = "localhost"
+port = 5432
+name = "opentogethertube"
+user = "ott"
+password = "your-password"
+```
+
+Alternatively, use a connection URL:
+
+```toml
+[db]
+url = "postgresql://user:password@localhost:5432/opentogethertube"
+```
+
+**Environment variables**: `DB_MODE`, `DATABASE_URL`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+
+## Redis Configuration
+
+```toml
+[redis]
+host = "localhost"
+port = 6379
+username = ""  # Optional
+password = ""  # Optional
+db = 0
+```
+
+Or use a connection URL:
+
+```toml
+[redis]
+url = "redis://username:password@localhost:6379/0"
+```
+
+**Environment variables**: `REDIS_URL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_DB`
+
+## Video Services
+
+### Enabled Services
+
+```toml
+[info_extractor]
+services = ["youtube", "vimeo", "googledrive", "peertube"]  # Allowlist
+```
+
+By default, all services are enabled. Specify an array to limit which video services are allowed.
+
+### YouTube Configuration
+
+```toml
+[info_extractor.youtube]
+api_key = "your-key"
+truncate_description = 500  # Optional: limit description length
+```
+
+### Google Drive Configuration
+
+```toml
+[info_extractor.google_drive]
+api_key = "your-google-drive-api-key"  # Optional
+```
+
+### Direct Video Configuration
+
+```toml
+[info_extractor.direct]
+ffprobe_path = "/usr/bin/ffprobe"
+preview_max_bytes = 10485760  # 10MB
+ffprobe_strategy = "stream"  # Options: stream, disk, run
+```
+
+**Environment variable**: `FFPROBE_PATH`
+
+### PeerTube Configuration
+
+```toml
+[info_extractor.peertube]
+instances = [
+  "video.sadmin.io",
+  "tube.shanti.cafe",
+  "peertube.tmp.rcp.tf"
+]
+emit_as_direct = true  # Use if embeds are broken
+```
+
+### Invidious Configuration
+
+```toml
+[info_extractor.invidious]
+instances = ["yt.safh.de", "inv.nadeko.net", "yewtu.be"]
+```
+
+## Search Configuration
+
+```toml
+[add_preview.search]
+enabled = true
+provider = "youtube"
+min_query_length = 3
+results_count = 8
+```
+
+```toml
+[add_preview]
+playlist_results_count = 40
+```
+
+**Environment variables**: `ENABLE_SEARCH`, `SEARCH_PROVIDER`
+
+## Authentication
+
+### Discord OAuth
+
+```toml
+[discord]
+client_id = "your-discord-client-id"
+client_secret = "your-discord-client-secret"
+```
+
+<Steps>
+  <Step title="Create Discord application">
+    Go to the [Discord Developer Portal](https://discord.com/developers/applications) and create a new application.
+  </Step>
+  
+  <Step title="Set callback URL">
+    Set the OAuth2 redirect URL to:
+    ```
+    https://<your-domain>/<base-url>/api/auth/discord/callback
+    ```
+    
+    For local development:
+    ```
+    http://localhost:8080/api/auth/discord/callback
+    ```
+  </Step>
+  
+  <Step title="Add credentials to config">
+    Copy the client ID and secret to your configuration file.
+  </Step>
+</Steps>
+
+**Environment variables**: `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`
+
+## Rate Limiting
+
+```toml
+[rate_limit]
+enabled = true
+key_prefix = "rateLimit"  # Redis key prefix
+```
+
+**Environment variable**: `ENABLE_RATE_LIMIT`
+
+## Room Settings
+
+```toml
+[room]
+enable_create_temporary = true
+enable_create_permanent = true
+unload_after = 300  # Seconds of inactivity before unloading
+expire_after = 7200  # Seconds to keep room state in Redis
+```
+
+## User Settings
+
+```toml
+[users]
+enable_registration = true
+```
+
+Set to `false` to disable new user registrations.
+
+## Video Features
+
+### SponsorBlock
+
+```toml
+[video.sponsorblock]
+enabled = true
+cache_ttl = 604800  # 1 week in seconds
+```
+
+## Advanced Configuration
+
+### CORS Proxy
+
+```toml
+cors_proxy = "https://cors-proxy.example.com"
+```
+
+Required for CORS-protected video services.
+
+### Short URL
+
+```toml
+short_url = "ott.app"
+```
+
+Domain for shortened invite URLs.
+
+**Environment variable**: `OTT_SHORT_URL_HOSTNAME`
+
+### Force Insecure Cookies
+
+```toml
+force_insecure_cookies = false
+```
+
+<Warning>
+Only enable this if running behind a reverse proxy that handles SSL termination.
+</Warning>
+
+**Environment variable**: `FORCE_INSECURE_COOKIES`
+
+### Load Balancing
+
+```toml
+[balancing]
+enabled = false
+port = 3002
+region = "us-east"
+```
+
+Enable if using the OTT load balancer.
+
+**Environment variables**: `BALANCING_ENABLED`, `BALANCING_PORT`, `BALANCING_REGION`
+
+## Email Configuration
+
+```toml
+[mail]
+enabled = false
+mailjet_api_key = "your-mailjet-key"
+mailjet_api_secret = "your-mailjet-secret"
+sender_email = "noreply@example.com"
+sender_name = "OpenTogetherTube"
+mailjet_sandbox = false
+```
+
+**Environment variables**: `MAILJET_API_KEY`, `MAILJET_API_SECRET`
+
+## Configuration Schema
+
+The complete configuration schema is defined in [`server/ott-config.ts`](https://github.com/dyc3/opentogethertube/blob/master/server/ott-config.ts). Most options support environment variable overrides as documented above.

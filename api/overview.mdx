@@ -1,0 +1,112 @@
+---
+title: API Overview
+description: Introduction to the OpenTogetherTube REST API and WebSocket interface
+---
+
+The OpenTogetherTube API provides both REST and WebSocket interfaces for managing rooms, users, and video synchronization.
+
+## Base URLs
+
+OpenTogetherTube is available at the following base URLs:
+
+- Production: `https://opentogethertube.com/`
+- Staging: `https://staging.opentogethertube.com/`
+- Development: `http://localhost:8080/`
+
+## API Structure
+
+The API is organized into the following sections:
+
+### REST API
+
+- **Rooms** - Create, manage, and interact with watch rooms
+- **Users** - User registration, login, and profile management
+- **Data** - Metadata endpoints for permissions and video previews
+- **Status** - Server health and metrics
+
+### WebSocket API
+
+- **Connection** - Real-time bidirectional communication
+- **Events** - Room state synchronization and user actions
+
+## Versioning
+
+API Version: **0.2.0**
+
+<Warning>
+All endpoints are subject to change spontaneously and without warning as new features are added or bugs are fixed.
+</Warning>
+
+## Response Format
+
+All REST API responses follow this structure:
+
+```json
+{
+  "success": true,
+  "data": { /* response data */ }
+}
+```
+
+Error responses:
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "ErrorName",
+    "message": "Error description"
+  }
+}
+```
+
+## Common Data Types
+
+### VideoId
+
+```typescript
+{
+  service: string  // e.g., "youtube"
+  id: string       // e.g., "dQw4w9WgXcQ"
+}
+```
+
+### Visibility
+
+Values: `"public"`, `"unlisted"`, `"private"`
+
+### QueueMode
+
+Values: `"manual"`, `"vote"`, `"loop"`, `"dj"`
+
+- **manual** - Videos play in order
+- **vote** - Videos are sorted by votes
+- **loop** - Current video repeats
+- **dj** - Current video restarts instead of advancing
+
+## Rate Limiting
+
+The API implements rate limiting to prevent abuse. Rate limits vary by endpoint:
+
+- Room creation: 50-200 points depending on room type
+- Adding videos: 3-5 points per video
+- Preview requests: 5-75 points depending on search complexity
+
+When rate limited, you'll receive a `429 Too Many Requests` response.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn how to authenticate API requests
+  </Card>
+  <Card title="Room Endpoints" icon="door-open" href="/api/rooms">
+    Manage watch rooms
+  </Card>
+  <Card title="WebSocket Events" icon="bolt" href="/api/websocket/overview">
+    Real-time synchronization
+  </Card>
+  <Card title="User Endpoints" icon="user" href="/api/users">
+    User management
+  </Card>
+</CardGroup>

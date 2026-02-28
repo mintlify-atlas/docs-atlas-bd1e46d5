@@ -1,80 +1,179 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with OpenTogetherTube in minutes and watch videos with friends
 ---
 
-## Get started in three steps
+Get started watching videos together in just a few simple steps. No account required!
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Visit OpenTogetherTube">
+    Go to [opentogethertube.com](https://opentogethertube.com/) in your web browser.
+    
+    You'll see the home page with options to create or join a room.
+  </Step>
 
-### Step 1: Set up your local environment
+  <Step title="Create a room">
+    Choose between two types of rooms:
+    
+    **Temporary Room**
+    - Click **Create Temporary Room** for a quick session
+    - Room name is automatically generated (e.g., `cheerful-elephant`)
+    - Room expires after 2 hours of inactivity
+    - No account needed
+    
+    **Permanent Room**
+    - Click **Create Permanent Room** to customize the name
+    - Enter a custom room name (e.g., `movie-night`)
+    - Room persists indefinitely
+    - Can be claimed with an account for ownership
+    
+    <Info>
+      Room URLs are shareable: `https://opentogethertube.com/room/your-room-name`
+    </Info>
+  </Step>
+
+  <Step title="Add videos">
+    Once in your room, add videos to watch:
+    
+    1. Click the **Add Video** button or search box
+    2. Enter a video URL or search query:
+       - YouTube videos or playlists
+       - Vimeo videos
+       - Direct video URLs (.mp4, .webm)
+       - HLS streams (.m3u8)
+       - DASH streams (.mpd)
+    3. Click **Add** to add the video to the queue
+    
+    <Tip>
+      You can search YouTube directly by typing keywords instead of a URL
+    </Tip>
+    
+    **Supported formats:**
+    ```
+    https://www.youtube.com/watch?v=...
+    https://youtu.be/...
+    https://vimeo.com/...
+    https://example.com/video.mp4
+    ```
+  </Step>
+
+  <Step title="Invite friends">
+    Share your room with friends:
+    
+    - **Copy the room URL** from your browser's address bar
+    - **Click the Share button** in the room to get a direct link
+    - Send the link via:
+      - Discord, Slack, or other chat apps
+      - Email or text message
+      - Social media
+    
+    Everyone who joins will see the same video at the same time!
+  </Step>
+</Steps>
+
+## Key features
+
+### Playback controls
+
+- **Play/Pause** - Everyone sees synchronized playback
+- **Seek** - Jump to any point in the video
+- **Skip** - Move to the next video in queue
+- **Playback speed** - Adjust speed from 0.25x to 2x
+
+### Room settings
+
+Access room settings via the ⚙️ icon:
+
+- **Title and description** - Customize your room
+- **Visibility** - Public, unlisted, or private
+- **Queue mode** - Manual, vote, loop, or DJ mode
+- **Permissions** - Control who can add videos, chat, and more
+
+<Note>
+  Only the room owner or administrators can change room settings
+</Note>
+
+### Vote mode
+
+Enable democratic video selection:
+
+- Room members vote on videos in the queue
+- Highest voted video plays next
+- Great for group movie nights
+
+### DJ mode
+
+Enable continuous playback with auto-skip:
+
+- Videos play automatically in order
+- Perfect for background music while gaming or working
+- No manual intervention needed
+
+### SponsorBlock integration
+
+Automatically skip sponsored segments:
+
+- Works with YouTube videos
+- Skip sponsor segments, intros, outros, and more
+- Configurable in client settings
+
+## Troubleshooting
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+  <Accordion title="Video won't play">
+    - Check that the video URL is supported
+    - Try refreshing the page
+    - Check your browser's console for errors
+    - Some videos may be region-blocked or require authentication
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+
+  <Accordion title="Playback is out of sync">
+    - Click your profile icon and select **Refresh**
+    - Check your internet connection
+    - Try reducing playback quality
   </Accordion>
-</AccordionGroup>
 
-### Step 2: Deploy your changes
+  <Accordion title="Can't add videos to queue">
+    - Check room permissions - you may need to request **add-to-queue** permission
+    - Contact the room owner or an administrator
+  </Accordion>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
+  <Accordion title="Room not found">
+    - Verify the room URL is correct
+    - Temporary rooms expire after 2 hours of inactivity
+    - The room may have been deleted by its owner
   </Accordion>
 </AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Core features"
+    icon="star"
+    href="/features/rooms"
+  >
+    Explore room management, permissions, and voting
+  </Card>
+  <Card
+    title="Self-host"
+    icon="server"
+    href="/self-hosting/deployment"
+  >
+    Deploy your own OpenTogetherTube instance
+  </Card>
+  <Card
+    title="Supported platforms"
+    icon="video"
+    href="/platforms/overview"
+  >
+    Learn about all supported video platforms
+  </Card>
+  <Card
+    title="API reference"
+    icon="code"
+    href="/api/overview"
+  >
+    Integrate OpenTogetherTube with your apps
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

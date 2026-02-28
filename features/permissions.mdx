@@ -1,0 +1,513 @@
+---
+title: Permissions System
+description: Fine-grained access control for room features
+---
+
+OpenTogetherTube uses a role-based permissions system that gives room owners and administrators precise control over who can perform various actions in a room.
+
+## Role Hierarchy
+
+Users are assigned roles that determine their permissions:
+
+```typescript
+enum Role {
+  Administrator = 4,
+  Moderator = 3,
+  TrustedUser = 2,
+  RegisteredUser = 1,
+  UnregisteredUser = 0,
+  Owner = -1  // Special role, always has all permissions
+}
+```
+
+<Note>
+  Roles inherit permissions from lower roles. For example, a Moderator has all permissions granted to TrustedUser, RegisteredUser, and UnregisteredUser.
+</Note>
+
+### Role Descriptions
+
+<AccordionGroup>
+  <Accordion title="Owner" icon="crown">
+    The room creator or claimer. Has all permissions and can configure permissions for other roles. Cannot be demoted.
+  </Accordion>
+  
+  <Accordion title="Administrator" icon="user-shield">
+    Can promote/demote users up to Administrator, configure room settings, and manage permissions for Moderator and below.
+  </Accordion>
+  
+  <Accordion title="Moderator" icon="gavel">
+    Can promote/demote Trusted Users, kick users, and typically has full queue management permissions.
+  </Accordion>
+  
+  <Accordion title="Trusted User" icon="user-check">
+    Registered users promoted for good behavior. Can kick regular users and typically has extended permissions.
+  </Accordion>
+  
+  <Accordion title="Registered User" icon="user">
+    Logged-in users. Default permissions depend on room configuration.
+  </Accordion>
+  
+  <Accordion title="Unregistered User" icon="user-secret">
+    Guest users without accounts. Usually have limited permissions.
+  </Accordion>
+</AccordionGroup>
+
+## Permission Types
+
+OpenTogetherTube defines 26 distinct permissions grouped by category:
+
+### Playback Control
+
+| Permission | Description | Default Min Role |
+|------------|-------------|------------------|
+| `playback.play-pause` | Play or pause the video | UnregisteredUser |
+| `playback.skip` | Skip the current video | UnregisteredUser |
+| `playback.seek` | Seek to a position | UnregisteredUser |
+| `playback.speed` | Change playback speed | UnregisteredUser |
+
+### Queue Management
+
+| Permission | Description | Default Min Role |
+|------------|-------------|------------------|
+| `manage-queue.add` | Add videos to queue | UnregisteredUser |
+| `manage-queue.remove` | Remove videos from queue | UnregisteredUser |
+| `manage-queue.order` | Reorder queue items | UnregisteredUser |
+| `manage-queue.vote` | Vote on videos (in vote mode) | UnregisteredUser |
+| `manage-queue.play-now` | Jump a video to the front | UnregisteredUser |
+
+### Room Configuration
+
+| Permission | Description | Default Min Role |
+|------------|-------------|------------------|
+| `configure-room.set-title` | Change room title | UnregisteredUser |
+| `configure-room.set-description` | Change room description | UnregisteredUser |
+| `configure-room.set-visibility` | Change public/unlisted/private | UnregisteredUser |
+| `configure-room.set-queue-mode` | Change queue mode | UnregisteredUser |
+| `configure-room.other` | Other settings (SponsorBlock, etc.) | UnregisteredUser |
+
+### Permission Management
+
+| Permission | Description | Default Min Role |
+|------------|-------------|------------------|
+| `configure-room.set-permissions.for-all-unregistered-users` | Configure unregistered permissions | RegisteredUser |
+| `configure-room.set-permissions.for-all-registered-users` | Configure registered permissions | TrustedUser |
+| `configure-room.set-permissions.for-trusted-users` | Configure trusted permissions | Moderator |
+| `configure-room.set-permissions.for-moderator` | Configure moderator permissions | Administrator |
+
+### User Management
+
+| Permission | Description | Default Min Role |
+|------------|-------------|------------------|
+| `manage-users.promote-trusted-user` | Promote to Trusted | TrustedUser |
+| `manage-users.demote-trusted-user` | Demote from Trusted | TrustedUser |
+| `manage-users.promote-moderator` | Promote to Moderator | Moderator |
+| `manage-users.demote-moderator` | Demote from Moderator | Moderator |
+| `manage-users.promote-admin` | Promote to Admin | Administrator |
+| `manage-users.demote-admin` | Demote from Admin | Administrator |
+| `manage-users.kick` | Kick users from room | TrustedUser |
+
+### Communication
+
+| Permission | Description | Default Min Role |
+|------------|-------------|------------------|
+| `chat` | Send chat messages | UnregisteredUser |
+
+## Grants System
+
+Permissions are stored as bitmasks for efficient checking:
+
+```typescript
+export class Permission {
+  name: PermissionName;
+  mask: GrantMask;  // Bit position (1 << n)
+  minRole: Role;    // Minimum required role
+}
+
+// Example permissions
+const PERMISSIONS = [
+  new Permission({ name: "playback.play-pause", mask: 1 << 0 }),
+  new Permission({ name: "playback.skip", mask: 1 << 1 }),
+  new Permission({ name: "playback.seek", mask: 1 << 2 }),
+  // ... 23 more permissions
+];
+```
+
+### The Grants Class
+
+The `Grants` class manages permissions for all roles:
+
+```typescript
+export class Grants {
+  masks: Map<Role, GrantMask> = new Map();
+  
+  // Check if a role has a permission
+  granted(role: Role, permission: PermissionName): boolean {
+    const checkmask = parseIntoGrantMask([permission]);
+    const fullmask = this.getMask(role);
+    return (fullmask & checkmask) === checkmask;
+  }
+  
+  // Throw exception if permission denied
+  check(role: Role, permission: PermissionName): void {
+    if (!this.granted(role, permission)) {
+      throw new PermissionDeniedException(permission);
+    }
+  }
+}
+```
+
+### Permission Inheritance
+
+Higher roles automatically inherit permissions from lower roles:
+
+```typescript
+private _processInheiritance(): void {
+  let fullmask: GrantMask = 0;
+  for (let i = Role.UnregisteredUser; i <= Role.Administrator; i++) {
+    fullmask |= this.getMask(i);  // OR with previous roles
+    this.masks.set(i, fullmask);
+  }
+}
+```
+
+<Info>
+  This means you can't revoke a permission from a higher role that a lower role has. Grant permissions progressively.
+</Info>
+
+## Permission Checking
+
+Every room request goes through permission checking:
+
+```typescript
+public async processRequest(
+  request: RoomRequest,
+  context: RoomRequestContext
+): Promise<void> {
+  // Map request types to required permissions
+  const permissions = new Map([
+    [RoomRequestType.PlaybackRequest, "playback.play-pause"],
+    [RoomRequestType.SkipRequest, "playback.skip"],
+    [RoomRequestType.SeekRequest, "playback.seek"],
+    [RoomRequestType.AddRequest, "manage-queue.add"],
+    // ... etc
+  ]);
+  
+  const permission = permissions.get(request.type);
+  if (permission) {
+    this.grants.check(context.role, permission);
+  }
+  
+  // Process request...
+}
+```
+
+If permission is denied, a `PermissionDeniedException` is thrown:
+
+```typescript
+export class PermissionDeniedException extends OttException {
+  constructor(permission: string) {
+    super(`Permission denied: ${permission}`);
+    this.name = "PermissionDeniedException";
+  }
+}
+```
+
+## Configuring Permissions
+
+Room owners can configure permissions through the settings UI or API:
+
+### Via API
+
+```http
+PATCH /api/room/:name
+
+Content-Type: application/json
+{
+  "grants": [
+    [0, 255],     // UnregisteredUser: basic permissions
+    [1, 65535],   // RegisteredUser: more permissions  
+    [2, 16777215] // TrustedUser: extensive permissions
+  ]
+}
+```
+
+### Via UI
+
+The `PermissionsEditor` component provides a visual interface:
+
+```vue
+<template>
+  <PermissionsEditor
+    v-model="settings.grants.value"
+    :current-role="store.getters['users/self']?.role ?? Role.Owner"
+  />
+</template>
+```
+
+### Using Permission Strings
+
+You can use permission name patterns:
+
+```typescript
+// Grant all playback permissions
+parseIntoGrantMask(["playback"])
+
+// Grant specific permissions
+parseIntoGrantMask(["playback.play-pause", "playback.seek"])
+
+// Grant all permissions
+parseIntoGrantMask(["*"])
+```
+
+## Role Assignment
+
+### Getting a User's Role
+
+```typescript
+getRole(user?: RoomUser): Role {
+  if (!user) {
+    return Role.UnregisteredUser;
+  }
+  if (this.isOwner(user)) {
+    return Role.Owner;
+  }
+  if (user.user) {
+    // Check promoted roles (Admin, Mod, Trusted)
+    for (let i = Role.Administrator; i >= Role.TrustedUser; i--) {
+      if (this.userRoles.get(i)?.has(user.user.id)) {
+        return i;
+      }
+    }
+  }
+  if (user.isLoggedIn) {
+    return Role.RegisteredUser;
+  }
+  return Role.UnregisteredUser;
+}
+```
+
+### Promoting Users
+
+Room moderators can promote users to higher roles:
+
+```typescript
+public async promoteUser(
+  request: PromoteRequest,
+  context: RoomRequestContext
+): Promise<void> {
+  const targetUser = this.getUser(request.targetClientId);
+  const targetCurrentRole = this.getRole(targetUser);
+  
+  // Check promotion permission
+  let perm: string | undefined;
+  switch (request.role) {
+    case Role.Administrator:
+      perm = "manage-users.promote-admin";
+      break;
+    case Role.Moderator:
+      perm = "manage-users.promote-moderator";
+      break;
+    case Role.TrustedUser:
+      perm = "manage-users.promote-trusted-user";
+      break;
+  }
+  if (perm) {
+    this.grants.check(context.role, perm);
+  }
+  
+  // Check demotion permission if downgrading
+  if (request.role < targetCurrentRole) {
+    // Requires demotion permission for target's current role
+    // ...
+  }
+  
+  // Apply role change
+  if (targetUser.user_id !== undefined) {
+    // Remove from all role sets
+    for (let i = Role.Administrator; i >= Role.TrustedUser; i--) {
+      this.userRoles.get(i)?.delete(targetUser.user_id);
+    }
+    // Add to new role set
+    if (request.role >= Role.TrustedUser) {
+      this.userRoles.get(request.role)?.add(targetUser.user_id);
+    }
+  }
+  
+  await this.syncUser(this.getUserInfo(targetUser.id));
+}
+```
+
+<Warning>
+  Only registered users can be promoted. Unregistered users must create an account first.
+</Warning>
+
+## Client-Side Permission Checks
+
+The client can check permissions before attempting actions:
+
+```typescript
+// In Vue component
+import { useGrants } from "@/components/composables/grants";
+
+const granted = useGrants();
+
+// Check if user can add videos
+if (granted("manage-queue.add")) {
+  // Show add button
+}
+```
+
+The `useGrants` composable:
+
+```typescript
+export function useGrants() {
+  const store = useStore();
+  
+  return (permission: PermissionName): boolean => {
+    const self = store.getters["users/self"];
+    if (!self) return false;
+    
+    return store.state.room.grants.granted(self.role, permission);
+  };
+}
+```
+
+## Default Permissions
+
+New rooms start with permissive defaults:
+
+```typescript
+function defaultPermissions(): Grants {
+  return new Grants({
+    [Role.UnregisteredUser]: parseIntoGrantMask([
+      "playback",
+      "manage-queue",
+      "chat",
+      "configure-room.set-title",
+      "configure-room.set-description",
+      "configure-room.set-visibility",
+      "configure-room.set-queue-mode",
+      "configure-room.other"
+    ]),
+    [Role.RegisteredUser]: parseIntoGrantMask([]),
+    [Role.TrustedUser]: parseIntoGrantMask([]),
+    [Role.Moderator]: parseIntoGrantMask([
+      "manage-users.promote-trusted-user",
+      "manage-users.demote-trusted-user",
+      "manage-users.kick"
+    ]),
+    [Role.Administrator]: parseIntoGrantMask(["*"]),
+    [Role.Owner]: parseIntoGrantMask(["*"])
+  });
+}
+```
+
+<Tip>
+  This configuration allows anyone to control playback in new rooms, making them immediately usable. Room owners should adjust permissions after claiming.
+</Tip>
+
+## Kicking Users
+
+Users with the `manage-users.kick` permission can remove others:
+
+```typescript
+public async kickUser(
+  request: KickRequest,
+  context: RoomRequestContext
+): Promise<void> {
+  const user = this.getUser(request.clientId);
+  if (!user) {
+    throw new ClientNotFoundInRoomException(this.name);
+  }
+  
+  if (canKickUser(context.role, this.getRole(user))) {
+    this.command({ type: "kick", clientId: request.clientId });
+  }
+}
+
+// From userutils.ts
+export function canKickUser(kickerRole: Role, targetRole: Role): boolean {
+  // Can't kick owner
+  if (targetRole === Role.Owner) return false;
+  
+  // Can only kick users with lower role
+  return kickerRole > targetRole;
+}
+```
+
+## Storage
+
+Permissions are stored in multiple locations:
+
+### Database (Permanent Rooms)
+
+```sql
+CREATE TABLE "Rooms" (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(32) UNIQUE,
+  permissions JSONB,  -- Serialized Grants
+  "role-admin" JSONB,   -- Array of user IDs
+  "role-mod" JSONB,
+  "role-trusted" JSONB,
+  -- ...
+);
+```
+
+### Redis (Active Rooms)
+
+```typescript
+interface RoomStateFromRedis {
+  grants: [Role, GrantMask][];  // Serialized as array of tuples
+  userRoles: [Role, number[]][]; // Role -> user IDs
+  // ...
+}
+```
+
+### Serialization
+
+```typescript
+// Grants to JSON
+toJSON(): [Role, GrantMask][] {
+  return [...this.masks];
+}
+
+// JSON to Grants  
+deserialize(value: string): void {
+  const g = JSON.parse(value);
+  this.setAllGrants(g);
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Start Restrictive">
+    Begin with minimal permissions for guests, grant more as needed.
+  </Step>
+  
+  <Step title="Use Roles Effectively">
+    Promote trusted community members to reduce moderation burden.
+  </Step>
+  
+  <Step title="Test Permissions">
+    Join your room as a guest to verify permissions work as expected.
+  </Step>
+  
+  <Step title="Document Your Setup">
+    Communicate your room's permission structure to users.
+  </Step>
+</Steps>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Room Management" icon="door-open" href="/features/rooms">
+    Room creation, ownership, and lifecycle
+  </Card>
+  <Card title="Video Sync" icon="arrows-rotate" href="/features/video-sync">
+    How playback control permissions are enforced
+  </Card>
+  <Card title="Vote Mode" icon="square-poll-vertical" href="/features/voting">
+    Democratic queue management with voting permissions
+  </Card>
+</CardGroup>

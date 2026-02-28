@@ -1,0 +1,523 @@
+---
+title: Room Endpoints
+description: REST API endpoints for managing OpenTogetherTube rooms
+---
+
+Rooms are the core concept in OpenTogetherTube - they represent a shared space where users watch videos together.
+
+## List Rooms
+
+### GET /api/room/list
+
+List all open public rooms, sorted by number of users (descending), then by room name.
+
+**Headers**
+
+<ParamField header="apikey" type="string">
+  Admin API key to list all rooms including private/unlisted (optional)
+</ParamField>
+
+```bash
+curl https://opentogethertube.com/api/room/list
+```
+
+**Response**
+
+Returns an array of room objects:
+
+<ResponseField name="name" type="string">
+  Room identifier
+</ResponseField>
+
+<ResponseField name="title" type="string">
+  Display title
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Room description
+</ResponseField>
+
+<ResponseField name="isTemporary" type="boolean">
+  Whether the room is temporary
+</ResponseField>
+
+<ResponseField name="visibility" type="string">
+  Visibility level: `public`, `unlisted`, or `private`
+</ResponseField>
+
+<ResponseField name="queueMode" type="string">
+  Queue mode: `manual`, `vote`, `loop`, or `dj`
+</ResponseField>
+
+<ResponseField name="currentSource" type="object">
+  Currently playing video (if any)
+</ResponseField>
+
+<ResponseField name="users" type="number">
+  Number of users in the room
+</ResponseField>
+
+```json
+[
+  {
+    "name": "popular-room",
+    "title": "Popular Room",
+    "description": "The most popular room",
+    "isTemporary": false,
+    "visibility": "public",
+    "queueMode": "manual",
+    "currentSource": {
+      "service": "youtube",
+      "id": "dQw4w9WgXcQ",
+      "title": "Video Title",
+      "length": 213
+    },
+    "users": 42
+  }
+]
+```
+
+## Generate Temporary Room
+
+### POST /api/room/generate
+
+Generate a temporary room with a random UUID name.
+
+**Authentication**: Required
+
+```bash
+curl -X POST https://opentogethertube.com/api/room/generate \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response**
+
+<ResponseField name="success" type="boolean">
+  Operation status
+</ResponseField>
+
+<ResponseField name="room" type="string">
+  The generated room name (UUID)
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "room": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+}
+```
+
+<Info>
+Rate limit: 50 points per request
+</Info>
+
+## Create Room
+
+### POST /api/room/create
+
+Create a new room with a custom name.
+
+**Authentication**: Required
+
+**Request Body**
+
+<ParamField body="name" type="string" required>
+  Room identifier (must be unique)
+</ParamField>
+
+<ParamField body="title" type="string" required>
+  Display title
+</ParamField>
+
+<ParamField body="description" type="string" required>
+  Room description
+</ParamField>
+
+<ParamField body="visibility" type="string" required>
+  Visibility: `public`, `unlisted`, or `private`
+</ParamField>
+
+<ParamField body="queueMode" type="string" required>
+  Queue mode: `manual`, `vote`, `loop`, or `dj`
+</ParamField>
+
+<ParamField body="temporary" type="boolean" required>
+  Whether the room is temporary
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/room/create \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-room",
+    "title": "My Watch Room",
+    "description": "A room for watching videos with friends",
+    "visibility": "public",
+    "queueMode": "manual",
+    "temporary": false
+  }'
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+<Info>
+Rate limit: 50 points for temporary rooms, 200 points for permanent rooms
+</Info>
+
+## Get Room Details
+
+### GET /api/room/{name}
+
+Get detailed information about a specific room.
+
+**Authentication**: Not required (but recommended for private rooms)
+
+```bash
+curl https://opentogethertube.com/api/room/my-room
+```
+
+**Response**
+
+<ResponseField name="name" type="string">
+  Room identifier
+</ResponseField>
+
+<ResponseField name="title" type="string">
+  Display title
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Room description
+</ResponseField>
+
+<ResponseField name="isTemporary" type="boolean">
+  Whether the room is temporary
+</ResponseField>
+
+<ResponseField name="visibility" type="string">
+  Visibility level
+</ResponseField>
+
+<ResponseField name="queueMode" type="string">
+  Queue mode
+</ResponseField>
+
+<ResponseField name="queue" type="array">
+  Array of queued videos
+</ResponseField>
+
+<ResponseField name="users" type="array">
+  Array of users currently in the room
+</ResponseField>
+
+<ResponseField name="grants" type="array">
+  Permission grants for each role
+</ResponseField>
+
+<ResponseField name="hasOwner" type="boolean">
+  Whether the room has an owner
+</ResponseField>
+
+<ResponseField name="autoSkipSegmentCategories" type="array">
+  SponsorBlock categories to auto-skip
+</ResponseField>
+
+```json
+{
+  "name": "my-room",
+  "title": "My Watch Room",
+  "description": "A room for watching videos",
+  "isTemporary": false,
+  "visibility": "public",
+  "queueMode": "manual",
+  "queue": [
+    {
+      "service": "youtube",
+      "id": "dQw4w9WgXcQ",
+      "title": "Video Title",
+      "length": 213
+    }
+  ],
+  "users": [
+    {
+      "id": "client-123",
+      "name": "Username",
+      "isLoggedIn": true,
+      "status": "ready",
+      "role": 2
+    }
+  ],
+  "grants": [[0, 255], [1, 511]],
+  "hasOwner": true,
+  "autoSkipSegmentCategories": ["sponsor", "intro"]
+}
+```
+
+## Update Room Settings
+
+### PATCH /api/room/{name}
+
+Update room settings or claim ownership.
+
+**Authentication**: Required
+
+**Request Body (Settings)**
+
+<ParamField body="title" type="string">
+  New room title
+</ParamField>
+
+<ParamField body="description" type="string">
+  New room description
+</ParamField>
+
+<ParamField body="visibility" type="string">
+  New visibility setting
+</ParamField>
+
+<ParamField body="queueMode" type="string">
+  New queue mode
+</ParamField>
+
+<ParamField body="grants" type="array">
+  Permission grants array
+</ParamField>
+
+<ParamField body="autoSkipSegmentCategories" type="array">
+  SponsorBlock categories to auto-skip
+</ParamField>
+
+```bash
+curl -X PATCH https://opentogethertube.com/api/room/my-room \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Updated Title",
+    "queueMode": "vote"
+  }'
+```
+
+**Request Body (Claim Ownership)**
+
+<ParamField body="claim" type="boolean">
+  Set to `true` to claim room ownership
+</ParamField>
+
+```bash
+curl -X PATCH https://opentogethertube.com/api/room/my-room \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"claim": true}'
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+## Delete/Unload Room
+
+### DELETE /api/room/{name}
+
+Unload a room from memory or permanently delete it.
+
+**Query Parameters**
+
+<ParamField query="permanent" type="boolean">
+  Set to `true` to permanently delete the room (requires ownership)
+</ParamField>
+
+**Unload (Admin Only)**
+
+```bash
+curl -X DELETE https://opentogethertube.com/api/room/my-room \
+  -H "apikey: YOUR_API_KEY"
+```
+
+**Permanent Delete (Owner Only)**
+
+```bash
+curl -X DELETE "https://opentogethertube.com/api/room/my-room?permanent=true" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+## Add to Queue
+
+### POST /api/room/{name}/queue
+
+Add one or more videos to the room's queue.
+
+**Authentication**: Required
+
+**Request Body (Single Video by ID)**
+
+<ParamField body="service" type="string" required>
+  Video service (e.g., `youtube`)
+</ParamField>
+
+<ParamField body="id" type="string" required>
+  Video ID
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/room/my-room/queue \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ"
+  }'
+```
+
+**Request Body (Single Video by URL)**
+
+<ParamField body="url" type="string" required>
+  Video URL
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/room/my-room/queue \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  }'
+```
+
+**Request Body (Multiple Videos)**
+
+<ParamField body="videos" type="array" required>
+  Array of VideoId objects
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/room/my-room/queue \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "videos": [
+      {"service": "youtube", "id": "dQw4w9WgXcQ"},
+      {"service": "youtube", "id": "jNQXAC9IVRw"}
+    ]
+  }'
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+<Info>
+Rate limit: 5 points for single video, 3 points per video for multiple videos
+</Info>
+
+## Remove from Queue
+
+### DELETE /api/room/{name}/queue
+
+Remove a video from the room's queue.
+
+**Authentication**: Required
+
+**Request Body**
+
+<ParamField body="service" type="string" required>
+  Video service
+</ParamField>
+
+<ParamField body="id" type="string" required>
+  Video ID
+</ParamField>
+
+```bash
+curl -X DELETE https://opentogethertube.com/api/room/my-room/queue \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ"
+  }'
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+<Info>
+Rate limit: 5 points per request
+</Info>
+
+## Vote for Video
+
+### POST /api/room/{name}/vote
+
+Add a vote for a video in the queue.
+
+**Authentication**: Required
+
+**Request Body**
+
+<ParamField body="service" type="string" required>
+  Video service
+</ParamField>
+
+<ParamField body="id" type="string" required>
+  Video ID
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/room/my-room/vote \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ"
+  }'
+```
+
+### DELETE /api/room/{name}/vote
+
+Remove a vote for a video.
+
+```bash
+curl -X DELETE https://opentogethertube.com/api/room/my-room/vote \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "youtube",
+    "id": "dQw4w9WgXcQ"
+  }'
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```

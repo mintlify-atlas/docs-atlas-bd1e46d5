@@ -1,0 +1,250 @@
+---
+title: 'Vimeo Support'
+description: 'How to add and play Vimeo videos in OpenTogetherTube'
+icon: 'vimeo'
+---
+
+Vimeo is a professional video hosting platform with high-quality content. OpenTogetherTube supports individual Vimeo videos through their oEmbed API.
+
+## Features
+
+<Card title="Individual Videos Only" icon="video">
+  Vimeo support is limited to individual video URLs. Collections, playlists, and channels are not supported.
+</Card>
+
+## Supported URL Format
+
+Vimeo URLs must follow this exact pattern:
+
+```
+https://vimeo.com/VIDEO_ID
+```
+
+### Valid Examples
+```
+https://vimeo.com/123456789
+https://www.vimeo.com/987654321
+```
+
+### Invalid Examples
+```
+https://vimeo.com/channels/staffpicks/123456789  ❌
+https://vimeo.com/user/username                   ❌
+https://vimeo.com/showcase/123456789              ❌
+```
+
+<Note>
+  The video ID must be numeric and directly after `vimeo.com/` in the URL path.
+</Note>
+
+## API Access
+
+<Info>
+  **No API key required!** Vimeo support uses the public oEmbed API which doesn't require authentication.
+</Info>
+
+The adapter uses Vimeo's oEmbed endpoint:
+```
+https://vimeo.com/api/oembed.json?url=VIDEO_URL
+```
+
+## Metadata Extraction
+
+The following video metadata is extracted from Vimeo:
+
+| Property | Source | Description |
+|----------|--------|-------------|
+| Title | `title` | Video title |
+| Description | `description` | Full video description |
+| Thumbnail | `thumbnail_url` | Video thumbnail image |
+| Duration | `duration` | Video length in seconds |
+
+### Example Response
+
+```json
+{
+  "title": "Example Video",
+  "description": "This is an example video description",
+  "thumbnail_url": "https://i.vimeocdn.com/video/123456789_640.jpg",
+  "duration": 180
+}
+```
+
+## Limitations
+
+<Warning>
+  Vimeo videos have several important limitations:
+</Warning>
+
+### Embedding Restrictions
+
+Vimeo allows video creators to disable embedding. If a video has embedding disabled:
+
+- API request returns HTTP 403 Forbidden
+- Video cannot be played in OpenTogetherTube
+- Error message: "Embedding for this video is disabled!"
+
+This is implemented in `vimeo.ts:66-70`:
+
+```typescript
+if (err.response && err.response.status === 403) {
+  log.error("Failed to get video info: Embedding for this video is disabled!");
+}
+```
+
+### No Collections
+
+Unlike YouTube, Vimeo support does not include:
+- ❌ Playlists
+- ❌ Showcases
+- ❌ Channels
+- ❌ User profiles
+- ❌ Video albums
+
+### No Search
+
+The Vimeo adapter does not support searching for videos. Users must provide direct video URLs.
+
+### Not Cache Safe
+
+Vimeo metadata has `isCacheSafe: false`, meaning:
+- Video metadata is fetched fresh each time
+- Metadata is not stored long-term in the database
+- Ensures up-to-date information but increases API calls
+
+## Privacy & Domain Support
+
+<Tip>
+  OpenTogetherTube can play both public and unlisted Vimeo videos, as long as embedding is enabled.
+</Tip>
+
+### Supported Privacy Settings
+- ✅ Public videos
+- ✅ Unlisted videos (with link)
+- ❌ Private videos (require password or permission)
+
+### Supported Domains
+- `vimeo.com`
+- `www.vimeo.com`
+
+Custom domains or Vimeo staff picks may not work correctly.
+
+## Error Handling
+
+Common errors you may encounter:
+
+<AccordionGroup>
+  <Accordion title="403 Forbidden">
+    **Cause**: Video creator disabled embedding for this video
+    
+    **Solution**: This video cannot be played in OTT. Try a different video or ask the creator to enable embedding.
+  </Accordion>
+  
+  <Accordion title="Invalid Video ID">
+    **Cause**: Video ID is not numeric or URL format is incorrect
+    
+    **Solution**: Verify the URL is in the format `https://vimeo.com/NUMERIC_ID`
+  </Accordion>
+  
+  <Accordion title="404 Not Found">
+    **Cause**: Video doesn't exist or has been deleted
+    
+    **Solution**: Check that the video ID is correct and the video is still available
+  </Accordion>
+</AccordionGroup>
+
+## Configuration
+
+Vimeo support works out-of-the-box with no configuration needed:
+
+```toml
+# No Vimeo-specific configuration required
+```
+
+## Video ID Validation
+
+The adapter validates video IDs before making API requests:
+
+```typescript
+if (!/^\d+$/.test(videoId)) {
+  throw new InvalidVideoIdException(this.serviceId, videoId);
+}
+```
+
+<Note>
+  Video IDs must contain only digits. Any non-numeric characters will be rejected.
+</Note>
+
+## Implementation Details
+
+<Accordion title="Technical Details">
+  The Vimeo adapter is implemented in `server/services/vimeo.ts` and is one of the simplest service adapters:
+  
+  - **File size**: Only 74 lines of code
+  - **API Client**: Uses axios with base URL `https://vimeo.com/api/oembed.json`
+  - **Dependencies**: No external service dependencies
+  - **Cache**: Does not use Redis or database caching
+  
+  Key methods:
+  - `canHandleURL()`: Checks for `vimeo.com` domain and numeric path (line 30-33)
+  - `getVideoId()`: Extracts the last segment of the URL path (line 39-42)
+  - `fetchVideoInfo()`: Makes oEmbed API request (line 44-72)
+  - `isCollectionURL()`: Always returns false (line 35-37)
+  
+  The adapter is marked as not cache-safe (`isCacheSafe: false`) because Vimeo video metadata and availability can change frequently.
+</Accordion>
+
+## Comparison with YouTube
+
+| Feature | YouTube | Vimeo |
+|---------|---------|-------|
+| API Key Required | ✅ Yes | ❌ No |
+| Individual Videos | ✅ Yes | ✅ Yes |
+| Playlists | ✅ Yes | ❌ No |
+| Channels | ✅ Yes | ❌ No |
+| Search | ✅ Yes | ❌ No |
+| Cache Safe | ✅ Yes | ❌ No |
+| Embedding Control | Platform-wide | Per-video |
+
+## Usage Example
+
+<Steps>
+  <Step title="Find a Vimeo Video">
+    Browse Vimeo and find a video you want to watch
+  </Step>
+  <Step title="Copy the URL">
+    Copy the URL from your browser (format: `https://vimeo.com/123456789`)
+  </Step>
+  <Step title="Add to Room">
+    Paste the URL into the "Add video" input in your OTT room
+  </Step>
+  <Step title="Play">
+    The video will be added to the queue and start playing automatically
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<CardGroup cols={2}>
+  <Card title="Video won't play" icon="circle-exclamation">
+    Check if embedding is enabled. Try playing the video on Vimeo.com first.
+  </Card>
+  <Card title="Wrong video loads" icon="shuffle">
+    Verify the video ID is correct. Vimeo IDs are numeric only.
+  </Card>
+  <Card title="Missing metadata" icon="circle-info">
+    Some Vimeo videos may have incomplete metadata. This is normal.
+  </Card>
+  <Card title="Slow loading" icon="clock">
+    Vimeo videos are not cached, so loading time depends on Vimeo's API response.
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Tip>
+  When sharing Vimeo videos with your OTT room:
+  - Use the simplest URL format possible
+  - Verify the video allows embedding before adding
+  - Check video availability if it fails to load
+</Tip>

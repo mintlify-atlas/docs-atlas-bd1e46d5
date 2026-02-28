@@ -1,0 +1,344 @@
+---
+title: "Database Configuration"
+description: "Configure PostgreSQL or SQLite for your OpenTogetherTube deployment"
+---
+
+## Database Options
+
+OTT supports two database backends:
+
+- **PostgreSQL** (recommended): Production-ready, scalable, and feature-complete
+- **SQLite**: Lightweight, file-based database suitable only for testing
+
+<Warning>
+SQLite is **not recommended** for production use. Use PostgreSQL for any deployment with real users.
+</Warning>
+
+## PostgreSQL (Recommended)
+
+PostgreSQL is the recommended database for all production deployments.
+
+### Using Docker Compose
+
+The default `docker-compose.yml` includes a PostgreSQL container:
+
+```yaml
+postgres_db:
+  container_name: opentogethertube_postgres
+  image: postgres:15-bullseye
+  environment:
+    - POSTGRES_DB=opentogethertube
+    - POSTGRES_USER=opentogethertube
+    - POSTGRES_PASSWORD=postgres
+  volumes:
+    - db-data-postgres:/var/lib/postgresql/data
+```
+
+The main OTT container connects using environment variables:
+
+```yaml
+opentogethertube:
+  environment:
+    - POSTGRES_USER=opentogethertube
+    - POSTGRES_DB=opentogethertube
+    - POSTGRES_HOST=postgres_db
+    - POSTGRES_PASSWORD=postgres
+```
+
+<Note>
+Change the default password `postgres` to a secure password in production!
+</Note>
+
+### Manual PostgreSQL Setup
+
+If installing PostgreSQL manually:
+
+<Steps>
+  <Step title="Install PostgreSQL">
+    ```bash
+    # Ubuntu/Debian
+    sudo apt install postgresql postgresql-contrib
+    
+    # CentOS/RHEL
+    sudo yum install postgresql-server postgresql-contrib
+    sudo postgresql-setup initdb
+    ```
+  </Step>
+  
+  <Step title="Create database and user">
+    ```bash
+    sudo -u postgres psql
+    ```
+    
+    ```sql
+    CREATE DATABASE opentogethertube;
+    CREATE USER ott WITH PASSWORD 'your-secure-password';
+    GRANT ALL PRIVILEGES ON DATABASE opentogethertube TO ott;
+    ```
+  </Step>
+  
+  <Step title="Configure OTT">
+    In `env/production.toml`:
+    
+    ```toml
+    [db]
+    mode = "postgres"
+    host = "localhost"
+    port = 5432
+    name = "opentogethertube"
+    user = "ott"
+    password = "your-secure-password"
+    ```
+    
+    Or use a connection URL:
+    
+    ```toml
+    [db]
+    url = "postgresql://ott:your-secure-password@localhost:5432/opentogethertube"
+    ```
+  </Step>
+  
+  <Step title="Run migrations">
+    ```bash
+    NODE_ENV=production yarn workspace ott-server run sequelize-cli db:migrate
+    ```
+  </Step>
+</Steps>
+
+### PostgreSQL Configuration Options
+
+```toml
+[db]
+mode = "postgres"
+
+# Individual connection parameters
+host = "localhost"
+port = 5432
+name = "opentogethertube"
+user = "ott"
+password = "your-password"
+
+# OR use connection URL (takes precedence)
+url = "postgresql://user:password@host:port/database"
+
+# Enable/disable metrics collection
+metrics = true
+```
+
+**Environment variables**:
+- `DB_MODE=postgres`
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `DATABASE_URL` (full connection URL)
+
+## SQLite (Not Recommended)
+
+SQLite uses a local file for data storage. Only suitable for development or testing.
+
+<Warning>
+**Do not use SQLite in production.** It has limitations:
+- Poor concurrency handling
+- No built-in replication
+- Limited scalability
+- File corruption risks
+</Warning>
+
+### SQLite Configuration
+
+In `env/production.toml`:
+
+```toml
+[db]
+mode = "sqlite"
+```
+
+**Environment variable**: `DB_MODE=sqlite`
+
+### SQLite Migrations
+
+When using SQLite, run migrations with the `DB_MODE` environment variable:
+
+```bash
+NODE_ENV=production DB_MODE=sqlite yarn workspace ott-server run sequelize-cli db:migrate
+```
+
+## Database Migrations
+
+OTT uses Sequelize for database migrations. You **must** run migrations:
+- On first deployment
+- After updating OTT to a new version
+- When the database schema changes
+
+### Running Migrations
+
+**For PostgreSQL**:
+```bash
+NODE_ENV=production yarn workspace ott-server run sequelize-cli db:migrate
+```
+
+**For SQLite**:
+```bash
+NODE_ENV=production DB_MODE=sqlite yarn workspace ott-server run sequelize-cli db:migrate
+```
+
+### Undoing Migrations
+
+To undo the last migration:
+
+```bash
+NODE_ENV=production yarn workspace ott-server run sequelize-cli db:migrate:undo
+```
+
+<Warning>
+Only undo migrations if you know what you're doing. This can result in data loss.
+</Warning>
+
+## Database Backups
+
+### PostgreSQL Backup
+
+Create a backup:
+
+```bash
+pg_dump -h localhost -U opentogethertube opentogethertube > backup.sql
+```
+
+For Docker containers:
+
+```bash
+docker exec opentogethertube_postgres pg_dump -U opentogethertube opentogethertube > backup.sql
+```
+
+### Restoring a Backup
+
+**To local Docker PostgreSQL**:
+
+1. Find the container IP:
+```bash
+docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' opentogethertube_postgres
+```
+
+2. Restore the backup:
+```bash
+psql -h <IP-address> -U opentogethertube -d postgres -f backup.sql
+```
+
+One-liner:
+```bash
+psql -h $(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' opentogethertube_postgres) -U opentogethertube -d postgres -f backup.sql
+```
+
+Default password for the Docker image: `postgres`
+
+**To standalone PostgreSQL**:
+
+```bash
+psql -h localhost -U opentogethertube -d opentogethertube -f backup.sql
+```
+
+### Automated Backups
+
+Set up a cron job for regular backups:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add daily backup at 2 AM
+0 2 * * * pg_dump -h localhost -U opentogethertube opentogethertube > /backups/ott-$(date +\%Y\%m\%d).sql
+```
+
+## Database Metrics
+
+OTT can collect and expose database metrics:
+
+```toml
+[db]
+metrics = true  # Enable database metrics (default: true)
+```
+
+Metrics are exposed alongside other application metrics and can be scraped by Prometheus.
+
+## Remote Database Connection
+
+For managed database services (AWS RDS, DigitalOcean, etc.):
+
+```toml
+[db]
+url = "postgresql://username:password@db-host.region.provider.com:5432/database"
+```
+
+Or using individual parameters:
+
+```toml
+[db]
+mode = "postgres"
+host = "db-host.region.provider.com"
+port = 5432
+name = "opentogethertube"
+user = "username"
+password = "password"
+```
+
+### SSL/TLS Connections
+
+For databases requiring SSL (common with managed services), set the connection URL with SSL parameters:
+
+```toml
+[db]
+url = "postgresql://user:pass@host:5432/db?sslmode=require"
+```
+
+## Troubleshooting
+
+### Connection refused
+
+- Verify PostgreSQL is running: `sudo systemctl status postgresql`
+- Check firewall allows connections on port 5432
+- Verify `pg_hba.conf` allows connections from your IP
+
+### Authentication failed
+
+- Verify username and password are correct
+- Check PostgreSQL user has proper privileges
+- Ensure password doesn't contain special characters that need URL encoding
+
+### Database does not exist
+
+- Create the database: `CREATE DATABASE opentogethertube;`
+- Verify database name matches configuration
+
+### Migration errors
+
+- Ensure database user has CREATE/ALTER privileges
+- Check that `NODE_ENV` is set correctly
+- For SQLite, ensure `DB_MODE=sqlite` is set
+- Verify you're in the correct directory (project root)
+
+## Performance Tuning
+
+For production PostgreSQL deployments, consider tuning:
+
+```sql
+-- Increase connection pool size
+max_connections = 100
+
+-- Increase shared buffers (25% of RAM)
+shared_buffers = 256MB
+
+-- Increase work memory for complex queries
+work_mem = 16MB
+
+-- Enable query logging for debugging
+log_statement = 'all'
+log_duration = on
+```
+
+Edit `/etc/postgresql/15/main/postgresql.conf` and restart PostgreSQL:
+
+```bash
+sudo systemctl restart postgresql
+```

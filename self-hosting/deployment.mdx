@@ -1,0 +1,177 @@
+---
+title: "Deployment Guide"
+description: "Deploy OpenTogetherTube on your own server using Docker or manual installation"
+---
+
+## Quickstart with Docker Compose
+
+The easiest way to deploy OTT on your own server is to use Docker Compose. This method will run OTT in production mode with Redis and PostgreSQL.
+
+<Note>
+This setup doesn't include a reverse proxy, so you'll need to configure that separately. See the [Reverse Proxy Setup](/self-hosting/reverse-proxy) guide.
+</Note>
+
+<Steps>
+  <Step title="Install Docker and Docker Compose">
+    Ensure you have Docker and Docker Compose installed on your server.
+  </Step>
+  
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/dyc3/opentogethertube.git
+    cd opentogethertube
+    ```
+  </Step>
+  
+  <Step title="Copy the example configuration">
+    ```bash
+    cp env/example.toml env/production.toml
+    ```
+  </Step>
+  
+  <Step title="Edit the configuration file">
+    Open `env/production.toml` and configure your instance:
+    - Set your `hostname` (e.g., `example.com:8080`)
+    - Add a YouTube API key from [Google Cloud Console](https://console.cloud.google.com)
+    - Generate secure secrets for `api_key` (≥40 characters) and `session_secret` (≥80 characters)
+    
+    See the [Configuration](/self-hosting/configuration) guide for all available options.
+  </Step>
+  
+  <Step title="Start the services">
+    ```bash
+    docker-compose up -d
+    ```
+    
+    This starts three containers:
+    - `opentogethertube` - The main application (port 8080)
+    - `opentogethertube_redis` - Redis cache
+    - `opentogethertube_postgres` - PostgreSQL database
+  </Step>
+</Steps>
+
+## Manual Deployment
+
+For more control over your deployment, you can install OTT manually without Docker.
+
+### Requirements
+
+- **Node.js**: Version matching the specification in [package.json](https://github.com/dyc3/opentogethertube/blob/master/package.json) (currently 20-22)
+- **Redis**: Required for session management and caching
+- **Database**: PostgreSQL (recommended) or SQLite (not recommended for production)
+- **YouTube API Key**: Obtain from [Google Cloud Console](https://console.cloud.google.com)
+
+### Installation Steps
+
+<Steps>
+  <Step title="Clone and configure">
+    ```bash
+    git clone https://github.com/dyc3/opentogethertube.git
+    cd opentogethertube
+    cp env/example.toml env/production.toml
+    ```
+    
+    Edit `env/production.toml` with your configuration.
+  </Step>
+  
+  <Step title="Install dependencies">
+    ```bash
+    corepack enable
+    yarn set version stable
+    yarn install
+    ```
+  </Step>
+  
+  <Step title="Run database migrations">
+    For PostgreSQL:
+    ```bash
+    NODE_ENV=production yarn workspace ott-server run sequelize-cli db:migrate
+    ```
+    
+    For SQLite (not recommended):
+    ```bash
+    NODE_ENV=production DB_MODE=sqlite yarn workspace ott-server run sequelize-cli db:migrate
+    ```
+  </Step>
+  
+  <Step title="Build the client">
+    ```bash
+    yarn run build
+    ```
+  </Step>
+  
+  <Step title="Start the server">
+    ```bash
+    NODE_ENV=production yarn start
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+You must run the database migrations and build steps every time you update OTT to a new version.
+</Warning>
+
+## Docker Compose Configuration
+
+The default `docker-compose.yml` sets up the following services:
+
+```yaml
+services:
+  opentogethertube:
+    image: dyc3/opentogethertube:latest
+    environment:
+      - PORT=8080
+      - REDIS_HOST=redis_db
+      - REDIS_PORT=6379
+      - POSTGRES_USER=opentogethertube
+      - POSTGRES_DB=opentogethertube
+      - POSTGRES_HOST=postgres_db
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./env:/app/env
+    ports:
+      - 8080:8080
+
+  redis_db:
+    image: redis
+    volumes:
+      - db-data-redis:/data
+
+  postgres_db:
+    image: postgres:15-bullseye
+    environment:
+      - POSTGRES_DB=opentogethertube
+      - POSTGRES_USER=opentogethertube
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - db-data-postgres:/var/lib/postgresql/data
+```
+
+## Environment Variables
+
+Key environment variables that can override configuration:
+
+- `NODE_ENV` - Set to `production` for production deployments
+- `PORT` - Server port (default: 3000)
+- `OTT_HOSTNAME` - Your domain name
+- `YOUTUBE_API_KEY` - YouTube Data API v3 key
+- `SESSION_SECRET` - Secret for session encryption (≥80 characters)
+- `OPENTOGETHERTUBE_API_KEY` - Admin API key (≥40 characters)
+- `DATABASE_URL` - Full PostgreSQL connection URL
+- `REDIS_URL` - Full Redis connection URL
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="sliders" href="/self-hosting/configuration">
+    Learn about all available configuration options
+  </Card>
+  
+  <Card title="Reverse Proxy" icon="server" href="/self-hosting/reverse-proxy">
+    Set up HTTPS with nginx or other reverse proxy
+  </Card>
+  
+  <Card title="Database" icon="database" href="/self-hosting/database">
+    Configure PostgreSQL or SQLite for your deployment
+  </Card>
+</CardGroup>

@@ -1,0 +1,462 @@
+---
+title: 'Direct Media Files'
+description: 'Support for direct video files, HLS streams, and DASH manifests'
+icon: 'file-video'
+---
+
+OpenTogetherTube can play direct media files, HLS streams, and DASH manifests hosted anywhere on the web. This is useful for self-hosted content, CDN-hosted videos, or streaming services.
+
+## Supported Formats
+
+<Tabs>
+  <Tab title="Direct Video">
+    ### Video Files
+    
+    Direct video file URLs are automatically detected by file extension:
+    
+    **Fully Supported**
+    - `.mp4` - MPEG-4 video
+    - `.webm` - WebM video
+    - `.ogv` - Ogg video
+    - `.mov` - QuickTime video
+    - `.m4v` - MPEG-4 video (Apple)
+    
+    **Partially Supported**
+    - `.mkv` - Matroska video (browser-dependent)
+    - `.avi` - AVI video (browser-dependent)
+    - `.flv` - Flash video (limited support)
+    
+    **Audio Files**
+    - `.mp3` - MPEG audio
+    - `.ogg` - Ogg audio
+    - `.flac` - FLAC audio
+    - `.wav` - WAV audio
+    - `.aac` - AAC audio
+  </Tab>
+  
+  <Tab title="HLS Streaming">
+    ### HTTP Live Streaming
+    
+    HLS streams use `.m3u8` playlist files:
+    
+    ```
+    https://example.com/video/playlist.m3u8
+    https://cdn.example.com/stream.m3u
+    ```
+    
+    **Features**
+    - Adaptive bitrate streaming
+    - Master and media playlists
+    - Automatic quality selection
+    - Segment-based playback
+    
+    **MIME Type**: `application/x-mpegURL`
+  </Tab>
+  
+  <Tab title="DASH Streaming">
+    ### Dynamic Adaptive Streaming
+    
+    DASH streams use `.mpd` manifest files:
+    
+    ```
+    https://example.com/video/manifest.mpd
+    ```
+    
+    **Features**
+    - Adaptive bitrate streaming
+    - Multiple audio tracks
+    - Subtitle support
+    - Industry standard format
+    
+    **MIME Type**: `application/dash+xml`
+  </Tab>
+</Tabs>
+
+## URL Requirements
+
+<Warning>
+  All direct media URLs must meet these requirements:
+</Warning>
+
+### ✅ Supported
+- HTTP and HTTPS URLs
+- Publicly accessible URLs
+- URLs with query parameters
+- CDN-hosted files
+- Authenticated URLs (with token in URL)
+
+### ❌ Not Supported
+- `file://` local file URLs
+- URLs requiring authentication headers
+- Password-protected files
+- URLs behind a login page
+
+## Metadata Extraction
+
+OpenTogetherTube uses **ffprobe** to extract metadata from direct media files.
+
+### ffprobe Strategies
+
+Three different strategies are available, configured in `ott-config`:
+
+<AccordionGroup>
+  <Accordion title="Stream Strategy" icon="stream">
+    **Default and Recommended**
+    
+    ```toml
+    [info_extractor]
+      [info_extractor.direct]
+        ffprobe_strategy = "stream"
+    ```
+    
+    - Streams video data directly to ffprobe
+    - No disk I/O required
+    - Fastest for most scenarios
+    - Best for remote files
+  </Accordion>
+  
+  <Accordion title="Run Strategy" icon="play">
+    ```toml
+    [info_extractor]
+      [info_extractor.direct]
+        ffprobe_strategy = "run"
+    ```
+    
+    - Runs ffprobe directly on the URL
+    - Simple and straightforward
+    - May have issues with some URLs
+  </Accordion>
+  
+  <Accordion title="Disk Strategy" icon="hard-drive">
+    ```toml
+    [info_extractor]
+      [info_extractor.direct]
+        ffprobe_strategy = "disk"
+    ```
+    
+    - Downloads a preview of the file to disk
+    - Runs ffprobe on the downloaded file
+    - Most reliable but slower
+    - Uses temporary storage
+  </Accordion>
+</AccordionGroup>
+
+### Extracted Metadata
+
+The following information is extracted:
+
+| Property | Source | Description |
+|----------|--------|-------------|
+| Title | File metadata or filename | Video title |
+| Description | Generated | Full URL of the file |
+| Duration | ffprobe analysis | Video/audio length in seconds |
+| MIME Type | Extension or ffprobe | Media type |
+
+## MIME Type Detection
+
+MIME types are detected in order of preference:
+
+1. **File Extension**: Quick lookup from filename
+2. **ffprobe Format**: Detected from file headers
+3. **Stream Analysis**: Check for video/audio streams
+4. **Generic Fallback**: Use `video/mp4` or `audio/mpeg`
+
+Implementation in `direct.ts:89-146`:
+
+```typescript
+const formatToMime = {
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  matroska: "video/x-matroska",
+  webm: "video/webm",
+  avi: "video/x-msvideo",
+  // ... more formats
+};
+```
+
+## HLS Streaming Details
+
+### Manifest Parsing
+
+HLS playlists are parsed using `m3u8-parser`:
+
+1. Fetch the `.m3u8` manifest
+2. Parse playlist structure
+3. If master playlist: select lowest bitrate variant
+4. If media playlist: calculate duration from segments
+5. Extract title from first segment
+
+### Duration Calculation
+
+```typescript
+// Sum of all segment durations
+duration = manifest.segments.reduce((acc, cur) => acc + cur.duration, 0);
+```
+
+Implementation in `hls.ts:49-102`
+
+<Note>
+  HLS duration is calculated by summing segment durations. If duration is 0, the stream is rejected.
+</Note>
+
+## DASH Streaming Details
+
+### Manifest Parsing
+
+DASH manifests are parsed using `@liveinstantly/dash-mpd-parser`:
+
+1. Fetch the `.mpd` manifest
+2. Parse XML structure to JSON
+3. Extract `mediaPresentationDuration`
+4. Parse ISO 8601 duration format
+5. Attempt to extract title from program info
+
+### Livestream Detection
+
+```typescript
+const durationRaw = manifest["MPD"]["@mediaPresentationDuration"];
+if (!durationRaw) {
+  throw new UnsupportedVideoType("livestream");
+}
+```
+
+DASH livestreams (without a fixed duration) are automatically rejected.
+
+### Title Extraction
+
+The adapter attempts multiple methods to find a title:
+
+1. `MPD.ProgramInformation.Title`
+2. `Period.AdaptationSet.Representation.Title`
+3. Fallback to filename from URL
+
+Implementation in `dash.ts:91-114`
+
+## Supported MIME Types
+
+The complete list of supported MIME types is defined in `mime.ts:31-42`:
+
+### Video
+```typescript
+/^video\/(?!x-flv)(?!x-matroska)(?!x-ms-wmv)(?!x-msvideo)[a-z0-9-]+$/
+```
+
+**Allowed**: Most video/* MIME types
+
+**Excluded**:
+- `video/x-flv` (Flash video)
+- `video/x-matroska` (MKV)
+- `video/x-ms-wmv` (Windows Media)
+- `video/x-msvideo` (AVI)
+
+### Audio
+```typescript
+/^audio\/(?!x-aiff)(?!x-wav)(?!aac)(?!flac)[a-z0-9-]+$/
+```
+
+**Allowed**: Most audio/* MIME types
+
+**Excluded**: Certain legacy formats
+
+### Streaming
+- `application/x-mpegURL` (HLS)
+- `application/dash+xml` (DASH)
+
+## Error Handling
+
+<CardGroup cols={2}>
+  <Card title="Local File Exception" icon="ban">
+    Thrown when URL uses `file://` protocol
+  </Card>
+  <Card title="Unsupported MIME Type" icon="file-excel">
+    Thrown when file format is not supported
+  </Card>
+  <Card title="Missing Metadata" icon="circle-exclamation">
+    Thrown when duration cannot be determined
+  </Card>
+  <Card title="M3u8 Parse Error" icon="code">
+    Thrown when HLS manifest is invalid
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### Direct Media Settings
+
+```toml
+[info_extractor]
+  [info_extractor.direct]
+    # ffprobe strategy: "stream", "run", or "disk"
+    ffprobe_strategy = "stream"
+```
+
+### PeerTube Integration
+
+PeerTube videos can be played as direct media:
+
+```toml
+[info_extractor]
+  [info_extractor.peertube]
+    # List of allowed PeerTube instances
+    instances = [
+      "peertube.example.com",
+      "videos.example.org"
+    ]
+    # Emit videos as direct/hls instead of peertube service
+    emit_as_direct = true
+```
+
+<Info>
+  When `emit_as_direct` is enabled, PeerTube videos are converted to HLS streams or direct video URLs for better compatibility.
+</Info>
+
+## Caching Behavior
+
+Direct media is **not cache-safe** (`isCacheSafe: false`):
+
+- Metadata is fetched fresh each time
+- URLs may expire or change
+- Content may be updated without URL change
+- Ensures accurate duration and metadata
+
+## Performance Considerations
+
+<Warning>
+  **ffprobe operations can be slow** for large files or remote URLs:
+</Warning>
+
+- **Stream strategy**: 1-5 seconds typically
+- **Run strategy**: 2-10 seconds depending on file size
+- **Disk strategy**: 5-30 seconds depending on download speed
+
+### Optimization Tips
+
+1. **Use stream strategy** for best performance
+2. **Host files on fast CDNs** to reduce latency
+3. **Use HLS/DASH** for large files to avoid full analysis
+4. **Keep files under 1GB** for faster metadata extraction
+
+## URL Pattern Detection
+
+Direct media is detected by file extension in the URL path:
+
+```typescript
+// Direct video/audio files (direct.ts:62-64)
+/\/*\.(mp(3|4v?)|mpg4|webm|flv|mkv|avi|wmv|qt|mov|ogv|m4v|h26[1-4]|ogg)$/
+
+// HLS playlists (hls.ts:32)
+/\/*\.(m3u8?)$/
+
+// DASH manifests (dash.ts:36)
+/\/*\.mpd$/
+```
+
+<Note>
+  Query parameters after the file extension are ignored during detection.
+</Note>
+
+## Security Considerations
+
+<Warning>
+  **Important security notes**:
+</Warning>
+
+- Local file URLs (`file://`) are **blocked** to prevent directory traversal
+- No verification of content-type headers
+- URLs are trusted after extension check
+- Consider rate limiting to prevent abuse
+
+## Usage Examples
+
+<Tabs>
+  <Tab title="MP4 File">
+    ```
+    https://cdn.example.com/videos/sample.mp4
+    https://example.com/media/video.mp4?token=abc123
+    ```
+    
+    Title extracted from filename or metadata tags.
+  </Tab>
+  
+  <Tab title="HLS Stream">
+    ```
+    https://stream.example.com/live/playlist.m3u8
+    https://cdn.example.com/vod/master.m3u8?token=xyz
+    ```
+    
+    Duration calculated from segment list.
+  </Tab>
+  
+  <Tab title="DASH Stream">
+    ```
+    https://stream.example.com/content/manifest.mpd
+    ```
+    
+    Duration from MPD mediaPresentationDuration.
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="ffprobe timeout">
+    **Cause**: File is too large or remote server is slow
+    
+    **Solutions**:
+    - Switch to "stream" strategy
+    - Use HLS/DASH for large files
+    - Host files on faster servers
+  </Accordion>
+  
+  <Accordion title="Duration is 0 or missing">
+    **Cause**: File metadata is incomplete or corrupted
+    
+    **Solutions**:
+    - Re-encode the video with proper metadata
+    - Use a different source file
+    - For HLS: check manifest has segments
+  </Accordion>
+  
+  <Accordion title="Unsupported MIME type">
+    **Cause**: File format is not in the supported list
+    
+    **Solutions**:
+    - Convert to MP4, WebM, or another supported format
+    - Check file extension matches content
+    - Use HLS/DASH wrapper for unsupported formats
+  </Accordion>
+  
+  <Accordion title="File:// URLs blocked">
+    **Cause**: Local file URLs are not allowed for security
+    
+    **Solutions**:
+    - Host files on a web server
+    - Use HTTP/HTTPS URLs instead
+    - Consider using a local web server for development
+  </Accordion>
+</AccordionGroup>
+
+## Implementation Details
+
+<Accordion title="Technical Details">
+  Three separate service adapters handle direct media:
+  
+  ### Direct Video Adapter (`direct.ts`)
+  - Handles: `.mp4`, `.webm`, `.mkv`, `.avi`, `.mov`, etc.
+  - Uses ffprobe strategies for metadata extraction
+  - MIME type detection from extension or format analysis
+  - Duration from video/audio stream analysis
+  
+  ### HLS Adapter (`hls.ts`)
+  - Handles: `.m3u8`, `.m3u`
+  - Uses `m3u8-parser` library
+  - Supports master and media playlists
+  - Duration from segment summation
+  
+  ### DASH Adapter (`dash.ts`)
+  - Handles: `.mpd`
+  - Uses `@liveinstantly/dash-mpd-parser`
+  - Parses XML to JSON
+  - ISO 8601 duration parsing
+  - Rejects livestreams without fixed duration
+</Accordion>

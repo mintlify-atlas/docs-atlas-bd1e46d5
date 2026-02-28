@@ -1,0 +1,422 @@
+---
+title: User Endpoints
+description: REST API endpoints for user registration, authentication, and profile management
+---
+
+Manage user accounts, authentication, and profiles.
+
+## Get Current User
+
+### GET /api/user
+
+Get information about the current user associated with the authentication token.
+
+**Authentication**: Required
+
+```bash
+curl https://opentogethertube.com/api/user \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response (Logged In)**
+
+<ResponseField name="username" type="string">
+  User's username
+</ResponseField>
+
+<ResponseField name="loggedIn" type="boolean">
+  Whether the user is logged into an account
+</ResponseField>
+
+<ResponseField name="discordLinked" type="boolean">
+  Whether the user has linked their Discord account
+</ResponseField>
+
+```json
+{
+  "username": "john_doe",
+  "loggedIn": true,
+  "discordLinked": true
+}
+```
+
+**Response (Not Logged In)**
+
+```json
+{
+  "username": "guest-swift-otter",
+  "loggedIn": false
+}
+```
+
+## Update Username
+
+### POST /api/user
+
+Update the username for the current session.
+
+**Authentication**: Required
+
+**Request Body**
+
+<ParamField body="username" type="string" required>
+  New username (max 20 characters)
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/user \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "new_username"}'
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+**Error: Username Taken**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "UsernameTaken",
+    "message": "Somebody else is already using that username."
+  }
+}
+```
+
+## Register Account
+
+### POST /api/user/register
+
+Register a new user account.
+
+**Authentication**: Required (token will be upgraded to registered session)
+
+**Request Body**
+
+<ParamField body="username" type="string" required>
+  Desired username
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Password
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/user/register \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_doe",
+    "email": "john@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+**Response**
+
+<ResponseField name="success" type="boolean">
+  Operation status
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  Created user information
+</ResponseField>
+
+<ResponseField name="user.username" type="string">
+  Username
+</ResponseField>
+
+<ResponseField name="user.email" type="string">
+  Email address
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "user": {
+    "username": "john_doe",
+    "email": "john@example.com"
+  }
+}
+```
+
+**Error Response**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "ValidationError",
+    "message": "Username is already taken",
+    "fields": ["username"]
+  }
+}
+```
+
+## Login
+
+### POST /api/user/login
+
+Log into an existing account.
+
+**Authentication**: Required (token will be upgraded to registered session)
+
+**Request Body**
+
+<ParamField body="email" type="string" required>
+  Email address
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Password
+</ParamField>
+
+<ParamField body="username" type="string">
+  Optional username (for backwards compatibility)
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/user/login \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+**Response**
+
+```json
+{
+  "success": true,
+  "user": {
+    "username": "john_doe",
+    "email": "john@example.com"
+  }
+}
+```
+
+**Error Response (Invalid Credentials)**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "AuthenticationError",
+    "message": "Invalid email or password"
+  }
+}
+```
+
+<Warning>
+Login attempts are rate-limited:
+- 100 attempts per IP per day
+- 10 consecutive failed attempts per username/IP combination blocks access for 1 hour
+</Warning>
+
+## Logout
+
+### POST /api/user/logout
+
+Log out of the current account session.
+
+**Authentication**: Required
+
+```bash
+curl -X POST https://opentogethertube.com/api/user/logout \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+After logout, the token remains valid but is no longer associated with the logged-in user account. A new guest username is assigned.
+
+## Get Owned Rooms
+
+### GET /api/user/owned-rooms
+
+Get all permanent rooms owned by the currently logged-in user.
+
+**Authentication**: Required (must be logged in)
+
+```bash
+curl https://opentogethertube.com/api/user/owned-rooms \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response**
+
+<ResponseField name="success" type="boolean">
+  Operation status
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of owned rooms
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "name": "my-room",
+      "title": "My Personal Room",
+      "description": "A room I created",
+      "isTemporary": false,
+      "visibility": "public",
+      "queueMode": "manual",
+      "currentSource": null,
+      "users": 0
+    }
+  ]
+}
+```
+
+**Error Response (Not Logged In)**
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "Unauthorized",
+    "message": "Not logged in."
+  }
+}
+```
+
+## Account Recovery
+
+### POST /api/user/recover/start
+
+Initiate account recovery process.
+
+**Request Body**
+
+<ParamField body="email" type="string" required>
+  Email address associated with the account
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/user/recover/start \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com"}'
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+A recovery email is sent to the address if an account exists.
+
+### POST /api/user/recover/verify
+
+Complete account recovery with verification key.
+
+**Request Body**
+
+<ParamField body="email" type="string" required>
+  Email address
+</ParamField>
+
+<ParamField body="verifyKey" type="string" required>
+  Verification key from recovery email
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  New password
+</ParamField>
+
+```bash
+curl -X POST https://opentogethertube.com/api/user/recover/verify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "verifyKey": "abc123...",
+    "password": "newpassword123"
+  }'
+```
+
+**Response**
+
+```json
+{
+  "success": true
+}
+```
+
+## OAuth (Discord)
+
+### GET /api/user/auth/discord
+
+Initiate Discord OAuth flow for linking Discord account.
+
+```bash
+curl https://opentogethertube.com/api/user/auth/discord
+```
+
+Redirects to Discord authorization page.
+
+### GET /api/user/auth/discord/callback
+
+Discord OAuth callback. Handled automatically by the server.
+
+## Common Error Responses
+
+### Rate Limited
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "RateLimitError",
+    "message": "Too many requests. Try again later."
+  }
+}
+```
+
+### Validation Error
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "ValidationError",
+    "message": "Invalid input",
+    "fields": ["email", "password"]
+  }
+}
+```
+
+### Length Out of Range
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "LengthOutOfRangeException",
+    "message": "Username length must be less than or equal to 20"
+  }
+}
+```

@@ -1,0 +1,120 @@
+---
+title: 'Supported Platforms'
+description: 'Overview of all video platforms and formats supported by OpenTogetherTube'
+icon: 'video'
+---
+
+OpenTogetherTube supports a wide variety of video platforms and media formats, allowing you to watch synchronized content from multiple sources.
+
+## Video Platforms
+
+<CardGroup cols={2}>
+  <Card title="YouTube" icon="youtube" color="#FF0000" href="/platforms/youtube">
+    Most popular video platform with full playlist and channel support
+  </Card>
+  <Card title="Vimeo" icon="vimeo" color="#1AB7EA" href="/platforms/vimeo">
+    Professional video hosting with high-quality content
+  </Card>
+  <Card title="Direct Media" icon="file-video" color="#6366F1" href="/platforms/direct-media">
+    MP4, WebM, and other direct video file URLs
+  </Card>
+  <Card title="Google Drive" icon="google-drive" color="#4285F4">
+    Videos hosted on Google Drive (requires API key)
+  </Card>
+  <Card title="PeerTube" icon="video" color="#F1680D">
+    Decentralized video platform support
+  </Card>
+  <Card title="HLS Streams" icon="stream" href="/platforms/direct-media">
+    HTTP Live Streaming (m3u8 playlists)
+  </Card>
+  <Card title="DASH Streams" icon="stream" href="/platforms/direct-media">
+    Dynamic Adaptive Streaming over HTTP (mpd manifests)
+  </Card>
+</CardGroup>
+
+## Platform Capabilities
+
+Each platform has different capabilities and requirements:
+
+| Platform | Collections | Search | API Key | Cache Safe |
+|----------|-------------|--------|---------|------------|
+| YouTube | Yes (Playlists, Channels) | Yes | Required | Yes |
+| Vimeo | No | No | No | No |
+| Direct Media | No | No | No | No |
+| HLS | No | No | No | No |
+| DASH | No | No | No | No |
+| Google Drive | Yes (Folders) | No | Required | No |
+| PeerTube | No | No | No | No |
+
+<Note>
+  **Cache Safe** indicates whether video metadata can be safely cached long-term without becoming stale.
+</Note>
+
+## How Platform Detection Works
+
+When you add a video URL to a room, OpenTogetherTube automatically detects which platform to use based on the URL pattern. Each service adapter checks if it can handle the URL:
+
+1. URL is parsed and validated
+2. Each service adapter's `canHandleURL()` method is checked
+3. First matching adapter is used to fetch video metadata
+4. Video is added to the room queue
+
+## Supported URL Patterns
+
+### YouTube
+- `https://youtube.com/watch?v=VIDEO_ID`
+- `https://youtu.be/VIDEO_ID`
+- `https://youtube.com/shorts/VIDEO_ID`
+- `https://youtube.com/live/VIDEO_ID`
+- `https://youtube.com/playlist?list=PLAYLIST_ID`
+- `https://youtube.com/@HANDLE`
+- `https://youtube.com/channel/CHANNEL_ID`
+- `https://youtube.com/c/CUSTOM_URL`
+- `https://youtube.com/user/USERNAME`
+
+### Vimeo
+- `https://vimeo.com/VIDEO_ID`
+
+### Direct Media
+- Any URL ending in: `.mp4`, `.webm`, `.mkv`, `.avi`, `.mov`, `.flv`, `.ogv`, `.m4v`, `.mp3`, `.ogg`
+- HLS: `.m3u8`, `.m3u`
+- DASH: `.mpd`
+
+### Google Drive
+- `https://drive.google.com/file/d/FILE_ID/view`
+- `https://drive.google.com/drive/folders/FOLDER_ID`
+
+### PeerTube
+- Configurable instance URLs: `https://INSTANCE_HOST/w/VIDEO_ID`
+
+## Adding New Videos
+
+To add a video to your room:
+
+1. Copy the video URL from the platform
+2. Paste it into the "Add video" input
+3. OpenTogetherTube will automatically fetch metadata
+4. The video is added to the queue
+
+<Info>
+  For playlists and channels, a preview of multiple videos will be shown before adding them to the queue.
+</Info>
+
+## Limitations
+
+<Warning>
+  Some platforms have specific limitations:
+  - **YouTube**: Livestreams are not supported
+  - **Vimeo**: Videos with embedding disabled cannot be played
+  - **Direct Media**: Local file URLs are blocked for security
+  - **PeerTube**: Only configured instances are allowed
+</Warning>
+
+## Configuration
+
+Some platforms require API keys or additional configuration. See the [Configuration Guide](/self-hosting/configuration) for details on:
+
+- Setting up YouTube API keys
+- Configuring Google Drive access
+- Enabling PeerTube instances
+- Adjusting ffprobe strategies for direct media

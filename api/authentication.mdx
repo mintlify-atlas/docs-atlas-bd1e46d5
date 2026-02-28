@@ -1,0 +1,181 @@
+---
+title: Authentication
+description: How to authenticate requests to the OpenTogetherTube API
+---
+
+OpenTogetherTube uses bearer tokens for authentication. All authenticated endpoints require a valid token.
+
+## Getting a Token
+
+Before making authenticated requests, you must obtain an authentication token.
+
+### GET /api/auth/grant
+
+Request an authentication token from the server.
+
+```bash
+curl -X GET https://opentogethertube.com/api/auth/grant
+```
+
+**Response**
+
+<ResponseField name="token" type="string" required>
+  Authentication token to use for subsequent requests
+</ResponseField>
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+The token is also set as an HTTP-only cookie named `token`.
+
+## Using the Token
+
+Include the token in one of two ways:
+
+### Authorization Header (Recommended)
+
+```bash
+curl -X GET https://opentogethertube.com/api/user \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+### Cookie
+
+If cookies are enabled, the token is automatically included in requests.
+
+## Session Types
+
+### Unregistered Sessions
+
+By default, tokens are associated with temporary, unregistered sessions. These sessions:
+
+- Have a randomly generated username
+- Do not persist across devices
+- Have limited permissions in rooms
+
+### Registered Sessions
+
+After logging in or registering, the token is upgraded to a registered session with:
+
+- Permanent username
+- Cross-device access
+- Enhanced permissions
+- Room ownership capabilities
+
+## API Key Authentication
+
+For administrative operations, an API key can be used instead of a bearer token.
+
+```bash
+curl -X GET https://opentogethertube.com/api/room/list \
+  -H "apikey: YOUR_API_KEY"
+```
+
+<Warning>
+API keys grant elevated privileges. Keep them secure and never expose them in client-side code.
+</Warning>
+
+## Token Validation
+
+If you already have a token, the `/api/auth/grant` endpoint will validate it. If valid, it returns the same token. If invalid, it issues a new one.
+
+```bash
+curl -X GET https://opentogethertube.com/api/auth/grant \
+  -H "Authorization: Bearer EXISTING_TOKEN"
+```
+
+## OAuth (Discord)
+
+OpenTogetherTube supports Discord OAuth for authentication.
+
+### GET /api/auth/discord
+
+Initiate Discord OAuth flow.
+
+**Query Parameters**
+
+<ParamField query="redirect" type="string">
+  URL to redirect to after successful authentication (default: `/`)
+</ParamField>
+
+```bash
+curl -X GET "https://opentogethertube.com/api/auth/discord?redirect=/room/my-room"
+```
+
+This redirects to Discord for authorization. After approval, Discord redirects to `/api/auth/discord/callback`.
+
+### GET /api/auth/discord/callback
+
+Discord OAuth callback endpoint. This is handled automatically by the server and should not be called directly.
+
+## Error Responses
+
+### Missing Token
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "MissingToken",
+    "message": "Missing auth token. Get a token from /api/auth/grant first."
+  }
+}
+```
+
+### Invalid Token
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "MissingToken",
+    "message": "Missing valid auth token. Get a token from /api/auth/grant first."
+  }
+}
+```
+
+### Unauthorized
+
+```json
+{
+  "success": false,
+  "error": {
+    "name": "Unauthorized",
+    "message": "apikey is invalid"
+  }
+}
+```
+
+## Example: Complete Authentication Flow
+
+```javascript
+// 1. Get a token
+const authResponse = await fetch('https://opentogethertube.com/api/auth/grant');
+const { token } = await authResponse.json();
+
+// 2. Use the token in subsequent requests
+const userResponse = await fetch('https://opentogethertube.com/api/user', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const user = await userResponse.json();
+console.log(user); // { username: "...", loggedIn: false }
+
+// 3. Optionally log in
+const loginResponse = await fetch('https://opentogethertube.com/api/user/login', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    email: 'user@example.com',
+    password: 'password123'
+  })
+});
+```
